@@ -6,11 +6,14 @@ import json
 import csv
 import re
 from bs4 import BeautifulSoup
+import asyncio
+from threading import Lock
 
 class Spider:
-    def __init__(self, url, cookie):
+    def __init__(self, url, cookie, mutex):
         self.url = url
         self.cookie = cookie.encode('utf-8').decode('latin1')
+        self.mutex = mutex
     
     def GetUserAgent(self):
         user_agent_list = [
@@ -41,7 +44,7 @@ class Spider:
         }
         return headers
 
-    def _Deep_Search(self, id):
+    async def _Deep_Search(self, id):
         url = "https://www.jiayuan.com/{}?fxly=search_v2".format(id)
         headers = self.GetUserAgent()
         headers['cookie'] = self.cookie
@@ -63,7 +66,7 @@ class Spider:
         else:
             sys.exit(-1)
 
-    def Req(self, page: int):
+    async def Req(self, page: int):
         payload = [
             ('sex', 'f'),
             ('key', ''), 
@@ -93,17 +96,18 @@ class Spider:
             print('失败获取数据')
             sys.exit(-1)
     
-    def Extarct(self, data):
+    async def Extarct(self, data):
         extract_data = []
         keys = ['uid', 'nickname', 'sex', 'marriage', 'height', 'education', 'income', 'work_location', 'image']
         user_info = data['userInfo']
         for item in user_info:
             extract_item = {}
             for k, v in item.items():
-                if k == 'uid' and v == '253091710':
+                if k == 'uid' and v == 253091710:
                     continue
                 elif k == 'realUid':
-                    details = self._Deep_Search(v)
+                    task = asyncio.create_task(self._Deep_Search(v))
+                    details = await task
                     extract_item = dict(extract_item, **details)
                 elif k in keys:
                     extract_item[k] = v
@@ -112,31 +116,38 @@ class Spider:
         return extract_data
 
     
-    def StoreCsv(self, filename, data):
+    async def StoreCsv(self, filename, data):
         with open(filename, 'a+', encoding='utf-8') as f:
             csv_writer = csv.writer(f)
             for item in data:
                 info = [str(v) for v in item.values()]
+                self.mutex.acquire()
                 csv_writer.writerow(info)
+                self.mutex.release()
+
+    async def Run(self, page: int, filename: str):
+        req_task = asyncio.create_task(self.Req(page))
+        data = await req_task
+        if len(data) == 0:
+            return
+        extract_task = asyncio.create_task(self.Extarct(data))
+        info = await extract_task
+        store_task = asyncio.create_task(self.StoreCsv(filename, info))
+        await store_task
 
 
-
-
-if __name__ == '__main__':
+async def main():
     url = 'https://search.jiayuan.com/v2/search_v2.php'
     cookie = 'guider_quick_search=on; accessID=20211202135956108286; save_jy_login_name=18630816527; stadate1=253091710; myloc=12%7C1207; myage=22; mysex=m; myuid=253091710; myincome=50; user_attr=000000; upt=8xrV2-DiJgNLaxEfnyzXCvYggkay2cZVhQleCdF3LRjMbBM6tbiuZ5iU1V093PEYrMmPrxDjsxV5o0bxv84np7sqEc8.; is_searchv2=1; skhistory_f=a%3A1%3A%7Bi%3A1640666916%3Bs%3A9%3A%22%E6%9C%89%E6%B0%94%E8%B4%A8%22%3B%7D; SESSION_HASH=8df3ef53fef81783d458aa67dee5f25d99c68d46; user_access=1; COMMON_HASH=b3537fe54438b10e458622110147b7e0; sl_jumper=%26cou%3D17%26omsg%3D0%26dia%3D0%26lst%3D2021-12-30; last_login_time=1640869075; PROFILE=254091710%3A%25E7%258B%2582%25E4%25B8%2594%3Am%3Aimages1.jyimg.com%2Fw4%2Fglobal%2Fi%3A0%3A%3A1%3Azwzp_m.jpg%3A1%3A1%3A50%3A10%3A3.0; PHPSESSID=8dd33c023609d323cc0cbc48b8865a88; pop_avatar=1; main_search:254091710=%7C%7C%7C00; RAW_HASH=MKP9%2Ahj-u3hydHEGb3RUB5jUlXOH9vtjjSdxRNPdWTANCeKcth3RIruSw4Ly0-ylwYG6z6QrhQ9%2Aex2PzY2HUyPkDdl9c3FeULCAWPKRpfOWQek.; pop_time=1640869108748'
-    spider = Spider(url, cookie)
-    header = ['用户id', '昵称', '性别', '婚姻状况', '身高', '受教育程度', '收入', '居住地', '照片']
-    # with open('data.csv', 'w+', encoding='utf-8') as f:
-    #     csv_writer = csv.writer(f)
-    #     csv_writer.writerow(header)
+    tasks = []
+    mutex = Lock()
+    for page in range(1, 500):
+        spider = Spider(url, cookie, mutex)
+        task = asyncio.create_task(spider.Run(page, 'data.csv'))
+        tasks.append(task)
 
-    # for page in range(1, 500):
-    #     data = spider.Req(page)
-    #     if len(data) == 0:
-    #         continue
-    #     info = spider.Extarct(data)
-    #     spider.StoreCsv('data.csv', info)
+    for task in tasks:
+        await task
 
-    data = spider.Req(1)
-    info = spider.Extarct(data)
+if __name__ == '__main__':
+    asyncio.run(main())
