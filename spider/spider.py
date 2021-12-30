@@ -4,6 +4,8 @@ import random
 import sys
 import json
 import csv
+import re
+from bs4 import BeautifulSoup
 
 class Spider:
     def __init__(self, url, cookie):
@@ -38,6 +40,28 @@ class Spider:
             "User-Agent" : random.choice(user_agent_list),\
         }
         return headers
+
+    def _Deep_Search(self, id):
+        url = "https://www.jiayuan.com/{}?fxly=search_v2".format(id)
+        headers = self.GetUserAgent()
+        headers['cookie'] = self.cookie
+        response = requests.get(url, headers=headers)
+        if response.status_code == 200:
+            html = BeautifulSoup(response.text, 'html.parser')
+            names = ['education', 'height', 'car', 'income', 'house', 'weight', 'constellation', 'nationality', 'zodiac', 'blood']
+            try:
+                results = html.find("ul", class_ = "member_info_list fn-clear").find_all('em')
+                pattern = r"<.*?>(.*?)<.*?>"
+                details = {}
+                for (index, item) in enumerate(results):
+                    info = re.findall(pattern, str(item)).pop()
+                    details[names[index]] = info
+                return details
+            except AttributeError:
+                print('[Error] AttributeError')
+                return {k: '--' for k in names}
+        else:
+            sys.exit(-1)
 
     def Req(self, page: int):
         payload = [
@@ -78,8 +102,12 @@ class Spider:
             for k, v in item.items():
                 if k == 'uid' and v == '253091710':
                     continue
-                if k in keys:
+                elif k == 'realUid':
+                    details = self._Deep_Search(v)
+                    extract_item = dict(extract_item, **details)
+                elif k in keys:
                     extract_item[k] = v
+            print(extract_item)
             extract_data.append(extract_item)
         return extract_data
 
@@ -96,16 +124,19 @@ class Spider:
 
 if __name__ == '__main__':
     url = 'https://search.jiayuan.com/v2/search_v2.php'
-    cookie = 'guider_quick_search=on; accessID=20211202135956108286; save_jy_login_name=18630816527; stadate1=253091710; myloc=12%7C1207; myage=22; mysex=m; myuid=253091710; myincome=50; user_attr=000000; SESSION_HASH=e11b01f94e4e0a0288f1d9b873e672c68a47fb24; user_access=1; COMMON_HASH=b3537fe54438b10e458622110147b7e0; last_login_time=1640666637; upt=8xrV2-DiJgNLaxEfnyzXCvYggkay2cZVhQleCdF3LRjMbBM6tbiuZ5iU1V093PEYrMmPrxDjsxV5o0bxv84np7sqEc8.; PHPSESSID=eeb9ef2df1582336696385cb274aa083; main_search:254091710=%7C%7C%7C00; is_searchv2=1; skhistory_f=a%3A1%3A%7Bi%3A1640666916%3Bs%3A9%3A%22%E6%9C%89%E6%B0%94%E8%B4%A8%22%3B%7D; pop_time=1640682976713; pop_avatar=1; PROFILE=254091710%3A%25E7%258B%2582%25E4%25B8%2594%3Am%3Aimages1.jyimg.com%2Fw4%2Fglobal%2Fi%3A0%3A%3A1%3Azwzp_m.jpg%3A1%3A1%3A50%3A10%3A3.0; RAW_HASH=q7dPSpNZaliBMQ4nQ73Oy9hpGMomOatpRO6YChrE32BVfU2EDLecXkhvN-0FbBRQbKUglXo-vpxUi3HMdWNplh4YuXBxPlQH6urnlir7%2AdgNWXg.'
+    cookie = 'guider_quick_search=on; accessID=20211202135956108286; save_jy_login_name=18630816527; stadate1=253091710; myloc=12%7C1207; myage=22; mysex=m; myuid=253091710; myincome=50; user_attr=000000; upt=8xrV2-DiJgNLaxEfnyzXCvYggkay2cZVhQleCdF3LRjMbBM6tbiuZ5iU1V093PEYrMmPrxDjsxV5o0bxv84np7sqEc8.; is_searchv2=1; skhistory_f=a%3A1%3A%7Bi%3A1640666916%3Bs%3A9%3A%22%E6%9C%89%E6%B0%94%E8%B4%A8%22%3B%7D; SESSION_HASH=8df3ef53fef81783d458aa67dee5f25d99c68d46; user_access=1; COMMON_HASH=b3537fe54438b10e458622110147b7e0; sl_jumper=%26cou%3D17%26omsg%3D0%26dia%3D0%26lst%3D2021-12-30; last_login_time=1640869075; PROFILE=254091710%3A%25E7%258B%2582%25E4%25B8%2594%3Am%3Aimages1.jyimg.com%2Fw4%2Fglobal%2Fi%3A0%3A%3A1%3Azwzp_m.jpg%3A1%3A1%3A50%3A10%3A3.0; PHPSESSID=8dd33c023609d323cc0cbc48b8865a88; pop_avatar=1; main_search:254091710=%7C%7C%7C00; RAW_HASH=MKP9%2Ahj-u3hydHEGb3RUB5jUlXOH9vtjjSdxRNPdWTANCeKcth3RIruSw4Ly0-ylwYG6z6QrhQ9%2Aex2PzY2HUyPkDdl9c3FeULCAWPKRpfOWQek.; pop_time=1640869108748'
     spider = Spider(url, cookie)
     header = ['用户id', '昵称', '性别', '婚姻状况', '身高', '受教育程度', '收入', '居住地', '照片']
-    with open('data.csv', 'w+', encoding='utf-8') as f:
-        csv_writer = csv.writer(f)
-        csv_writer.writerow(header)
+    # with open('data.csv', 'w+', encoding='utf-8') as f:
+    #     csv_writer = csv.writer(f)
+    #     csv_writer.writerow(header)
 
-    for page in range(1, 500):
-        data = spider.Req(page)
-        if len(data) == 0:
-            continue
-        info = spider.Extarct(data)
-        spider.StoreCsv('data.csv', info)
+    # for page in range(1, 500):
+    #     data = spider.Req(page)
+    #     if len(data) == 0:
+    #         continue
+    #     info = spider.Extarct(data)
+    #     spider.StoreCsv('data.csv', info)
+
+    data = spider.Req(1)
+    info = spider.Extarct(data)
