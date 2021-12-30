@@ -43,7 +43,7 @@ class Spider:
         payload = [
             ('sex', 'f'),
             ('key', ''), 
-            ('stc', '1:12,2:18.27,23:1'),
+            ('stc', '23:1'),
             ('sn', 'default'),
             ('sv', '1'),
             ('p', str(page)),
@@ -71,11 +71,13 @@ class Spider:
     
     def Extarct(self, data):
         extract_data = []
-        keys = ['uid', 'nickname', 'sex', 'marriage', 'height', 'education', 'income', 'work_location', 'work_ublocation', 'image']
+        keys = ['uid', 'nickname', 'sex', 'marriage', 'height', 'education', 'income', 'work_location', 'image']
         user_info = data['userInfo']
         for item in user_info:
             extract_item = {}
             for k, v in item.items():
+                if k == 'uid' and v == '253091710':
+                    continue
                 if k in keys:
                     extract_item[k] = v
             extract_data.append(extract_item)
@@ -94,14 +96,14 @@ class Spider:
 
 if __name__ == '__main__':
     url = 'https://search.jiayuan.com/v2/search_v2.php'
-    cookie = 'guider_quick_search=on; accessID=20211202135956108286; save_jy_login_name=18630816527; stadate1=253091710; myloc=12|1207; myage=22; mysex=m; myuid=253091710; myincome=50; user_attr=000000; SESSION_HASH=e11b01f94e4e0a0288f1d9b873e672c68a47fb24; user_access=1; COMMON_HASH=b3537fe54438b10e458622110147b7e0; sl_jumper=&cou=17&omsg=0&dia=0&lst=2021-12-02; last_login_time=1640666637; upt=8xrV2-DiJgNLaxEfnyzXCvYggkay2cZVhQleCdF3LRjMbBM6tbiuZ5iU1V093PEYrMmPrxDjsxV5o0bxv84np7sqEc8.; PROFILE=254091710:%E7%8B%82%E4%B8%94:m:images1.jyimg.com/w4/global/i:0::1:zwzp_m.jpg:1:1:50:10:3.0; PHPSESSID=eeb9ef2df1582336696385cb274aa083; pop_avatar=1; main_search:254091710=|||00; RAW_HASH=ephvZ4K48PHIvl0fQLiaVuIRsjEU-G4hxBV3bqajJRIgYiaT6iR6NektDHhqNauE9DDhZbi64HfizctxTIO96NqftKvUw1T1sBZei5FtVKpZ4u8.; is_searchv2=1; skhistory_f=a:1:{i:1640666916;s:9:"有气质";}; pop_time=1640667771707'
+    cookie = 'guider_quick_search=on; accessID=20211202135956108286; save_jy_login_name=18630816527; stadate1=253091710; myloc=12%7C1207; myage=22; mysex=m; myuid=253091710; myincome=50; user_attr=000000; SESSION_HASH=e11b01f94e4e0a0288f1d9b873e672c68a47fb24; user_access=1; COMMON_HASH=b3537fe54438b10e458622110147b7e0; last_login_time=1640666637; upt=8xrV2-DiJgNLaxEfnyzXCvYggkay2cZVhQleCdF3LRjMbBM6tbiuZ5iU1V093PEYrMmPrxDjsxV5o0bxv84np7sqEc8.; PHPSESSID=eeb9ef2df1582336696385cb274aa083; main_search:254091710=%7C%7C%7C00; is_searchv2=1; skhistory_f=a%3A1%3A%7Bi%3A1640666916%3Bs%3A9%3A%22%E6%9C%89%E6%B0%94%E8%B4%A8%22%3B%7D; pop_time=1640682976713; pop_avatar=1; PROFILE=254091710%3A%25E7%258B%2582%25E4%25B8%2594%3Am%3Aimages1.jyimg.com%2Fw4%2Fglobal%2Fi%3A0%3A%3A1%3Azwzp_m.jpg%3A1%3A1%3A50%3A10%3A3.0; RAW_HASH=q7dPSpNZaliBMQ4nQ73Oy9hpGMomOatpRO6YChrE32BVfU2EDLecXkhvN-0FbBRQbKUglXo-vpxUi3HMdWNplh4YuXBxPlQH6urnlir7%2AdgNWXg.'
     spider = Spider(url, cookie)
-    header = ['用户id', '昵称', '性别', '婚姻状况', '身高', '受教育程度', '居住地', '照片']
+    header = ['用户id', '昵称', '性别', '婚姻状况', '身高', '受教育程度', '收入', '居住地', '照片']
     with open('data.csv', 'w+', encoding='utf-8') as f:
         csv_writer = csv.writer(f)
         csv_writer.writerow(header)
 
-    for page in range(2, 100):
+    for page in range(1, 500):
         data = spider.Req(page)
         if len(data) == 0:
             continue
