@@ -1,4 +1,6 @@
 from json.decoder import JSONDecodeError
+from math import sin
+import time
 import requests
 import random
 import sys
@@ -11,6 +13,8 @@ from threading import Lock
 from selenium import webdriver
 from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.common.by import By
 
 class SliderCrack:
     def __init__(self, url, cookie):
@@ -24,16 +28,58 @@ class SliderCrack:
         self.wait = WebDriverWait(self.browser, 20)
 
     def open_page(self):
-        self.browser.get(self.url)
-        # self.browser.add_cookie(self.cookie)
-        # self.browser.get('https://www.taobao.com/')
-        # print(self.browser.page_source)
+        self.browser.get(self.url) 
+        button = self.get_geetest_button()
+        button.click()
+        # self.browser.close()
+
+    # 模拟点击
+    def get_geetest_button(self):
+        button = self.wait.until(EC.element_to_be_clickable((By.CLASS_NAME, "geetest_slider_button")))
+        return button
+
+    def get_slider(self):
+        """
+        获取滑块
+        返回：滑块对象
+        """
+        slider = self.wait.until(EC.element_to_be_clickable((By.CLASS_NAME, 'geetest_slider_button')))
+        return slider
+
+    # 识别缺口
+    def get_position(self):
+        """
+        获取验证码位置
+        返回：验证码位置元组
+        """
+        img = self.wait.until(EC.presence_of_element_located(By.CLASS_NAME, 'geetest_canvas_bg geetest_absolute'))
+        time.sleep(2)
+        location = img.location
+        size = img.size
+        top, bottom, left, right = location['y'], location['y'] + size['height'], location['x'], location['x'] + size['width']
+        return (top, bottom, left, right)
+
+    def get_geetest_image(self, name = 'captcha.png'):
+        """
+        获取验证码图片
+        返回：图片对象
+        """
+        top, bottom, left, right = self.get_position()
+        print('验证码位置: ', top, bottom, left, right)
+        screenshot = self.get_screenshot()
+        captcha = screenshot.crop((left, top, right, bottom))
+        return captcha
+
+    def get_image_info(self):
+        pass
 
 class Spider:
-    def __init__(self, url, cookie, mutex):
+    def __init__(self, url, cookie, mutex, viste_lock):
         self.url = url
         self.cookie = cookie.encode('utf-8').decode('latin1')
         self.mutex = mutex
+        self.viste_lock = viste_lock
+        self.ok_visit = True
     
     def GetUserAgent(self):
         user_agent_list = [
@@ -82,8 +128,12 @@ class Spider:
                 return details
             except AttributeError:
                 print('[Error] AttributeError')
+                self.viste_lock.acquire()
+                self.ok_visit = False
                 slide_crack = SliderCrack(url, self.cookie)
                 slide_crack.open_page()
+                self.ok_visit = True
+                self.viste_lock.release()
                 return {k: '--' for k in names}
         else:
             sys.exit(-1)
@@ -128,9 +178,13 @@ class Spider:
                 if k == 'uid' and v == 253091710:
                     continue
                 elif k == 'realUid':
-                    task = asyncio.create_task(self._Deep_Search(v))
-                    details = await task
-                    extract_item = dict(extract_item, **details)
+                    while self.ok_visit == False:
+                        time.sleep(1)
+                    if self.ok_visit == True:
+                        # task = asyncio.create_task(self._Deep_Search(v))
+                        # details = await task
+                        details = await self._Deep_Search(v)
+                        extract_item = dict(extract_item, **details)
                 elif k in keys:
                     extract_item[k] = v
             print(extract_item)
@@ -148,14 +202,17 @@ class Spider:
                 self.mutex.release()
 
     async def Run(self, page: int, filename: str):
-        req_task = asyncio.create_task(self.Req(page))
-        data = await req_task
+        # req_task = asyncio.create_task(self.Req(page))
+        # data = await req_task
+        data = await self.Req(page)
         if len(data) == 0:
             return
-        extract_task = asyncio.create_task(self.Extarct(data))
-        info = await extract_task
-        store_task = asyncio.create_task(self.StoreCsv(filename, info))
-        await store_task
+        # extract_task = asyncio.create_task(self.Extarct(data))
+        # info = await extract_task
+        info = await self.Extarct(data)
+        # store_task = asyncio.create_task(self.StoreCsv(filename, info))
+        # await store_task
+        await self.StoreCsv(filename, info)
 
 
 async def main():
@@ -166,8 +223,9 @@ async def main():
     cookie_txt.close()
     tasks = []
     mutex = Lock()
+    viste_lock = Lock()
     for page in range(1, 2):
-        spider = Spider(url, cookie, mutex)
+        spider = Spider(url, cookie, mutex, viste_lock)
         task = asyncio.create_task(spider.Run(page, 'data.csv'))
         tasks.append(task)
 
