@@ -8,6 +8,26 @@ import re
 from bs4 import BeautifulSoup
 import asyncio
 from threading import Lock
+from selenium import webdriver
+from selenium.webdriver.common.action_chains import ActionChains
+from selenium.webdriver.support.ui import WebDriverWait
+
+class SliderCrack:
+    def __init__(self, url, cookie):
+        option = webdriver.ChromeOptions()
+        option.add_argument("user-data-dir=D:\python-3.7.8\profile")
+        self.url = url 
+        self.browser = webdriver.Chrome(chrome_options=option)
+        self.cookie = cookie
+        # 为打开的网页添加cookie
+        # self.browser.add_cookie(cookie)
+        self.wait = WebDriverWait(self.browser, 20)
+
+    def open_page(self):
+        self.browser.get(self.url)
+        # self.browser.add_cookie(self.cookie)
+        # self.browser.get('https://www.taobao.com/')
+        # print(self.browser.page_source)
 
 class Spider:
     def __init__(self, url, cookie, mutex):
@@ -62,6 +82,8 @@ class Spider:
                 return details
             except AttributeError:
                 print('[Error] AttributeError')
+                slide_crack = SliderCrack(url, self.cookie)
+                slide_crack.open_page()
                 return {k: '--' for k in names}
         else:
             sys.exit(-1)
@@ -138,10 +160,13 @@ class Spider:
 
 async def main():
     url = 'https://search.jiayuan.com/v2/search_v2.php'
-    cookie = 'guider_quick_search=on; accessID=20211202135956108286; save_jy_login_name=18630816527; stadate1=253091710; myloc=12%7C1207; myage=22; mysex=m; myuid=253091710; myincome=50; user_attr=000000; upt=8xrV2-DiJgNLaxEfnyzXCvYggkay2cZVhQleCdF3LRjMbBM6tbiuZ5iU1V093PEYrMmPrxDjsxV5o0bxv84np7sqEc8.; is_searchv2=1; skhistory_f=a%3A1%3A%7Bi%3A1640666916%3Bs%3A9%3A%22%E6%9C%89%E6%B0%94%E8%B4%A8%22%3B%7D; SESSION_HASH=8df3ef53fef81783d458aa67dee5f25d99c68d46; user_access=1; COMMON_HASH=b3537fe54438b10e458622110147b7e0; sl_jumper=%26cou%3D17%26omsg%3D0%26dia%3D0%26lst%3D2021-12-30; last_login_time=1640869075; PROFILE=254091710%3A%25E7%258B%2582%25E4%25B8%2594%3Am%3Aimages1.jyimg.com%2Fw4%2Fglobal%2Fi%3A0%3A%3A1%3Azwzp_m.jpg%3A1%3A1%3A50%3A10%3A3.0; PHPSESSID=8dd33c023609d323cc0cbc48b8865a88; pop_avatar=1; main_search:254091710=%7C%7C%7C00; RAW_HASH=MKP9%2Ahj-u3hydHEGb3RUB5jUlXOH9vtjjSdxRNPdWTANCeKcth3RIruSw4Ly0-ylwYG6z6QrhQ9%2Aex2PzY2HUyPkDdl9c3FeULCAWPKRpfOWQek.; pop_time=1640869108748'
+    # cookie = 'guider_quick_search=on; accessID=20211202135956108286; save_jy_login_name=18630816527; stadate1=253091710; myloc=12%7C1207; myage=22; mysex=m; myuid=253091710; myincome=50; user_attr=000000; upt=8xrV2-DiJgNLaxEfnyzXCvYggkay2cZVhQleCdF3LRjMbBM6tbiuZ5iU1V093PEYrMmPrxDjsxV5o0bxv84np7sqEc8.; is_searchv2=1; skhistory_f=a%3A1%3A%7Bi%3A1640666916%3Bs%3A9%3A%22%E6%9C%89%E6%B0%94%E8%B4%A8%22%3B%7D; SESSION_HASH=8df3ef53fef81783d458aa67dee5f25d99c68d46; user_access=1; COMMON_HASH=b3537fe54438b10e458622110147b7e0; sl_jumper=%26cou%3D17%26omsg%3D0%26dia%3D0%26lst%3D2021-12-30; last_login_time=1640869075; PROFILE=254091710%3A%25E7%258B%2582%25E4%25B8%2594%3Am%3Aimages1.jyimg.com%2Fw4%2Fglobal%2Fi%3A0%3A%3A1%3Azwzp_m.jpg%3A1%3A1%3A50%3A10%3A3.0; PHPSESSID=8dd33c023609d323cc0cbc48b8865a88; pop_avatar=1; main_search:254091710=%7C%7C%7C00; RAW_HASH=MKP9%2Ahj-u3hydHEGb3RUB5jUlXOH9vtjjSdxRNPdWTANCeKcth3RIruSw4Ly0-ylwYG6z6QrhQ9%2Aex2PzY2HUyPkDdl9c3FeULCAWPKRpfOWQek.; pop_time=1640869108748'
+    cookie_txt = open('cookie.txt', mode='r')
+    cookie = cookie_txt.read()
+    cookie_txt.close()
     tasks = []
     mutex = Lock()
-    for page in range(1, 500):
+    for page in range(1, 2):
         spider = Spider(url, cookie, mutex)
         task = asyncio.create_task(spider.Run(page, 'data.csv'))
         tasks.append(task)
@@ -151,3 +176,4 @@ async def main():
 
 if __name__ == '__main__':
     asyncio.run(main())
+    # driver = webdriver.Chrome()
