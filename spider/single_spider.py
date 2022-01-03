@@ -6,79 +6,20 @@ import json
 import csv
 import re
 from bs4 import BeautifulSoup
-import asyncio
-import threading
 from json.decoder import JSONDecodeError
 from threading import Lock
-from selenium import webdriver
-from selenium.webdriver.common.action_chains import ActionChains
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.common.by import By
+from slider_crack import SliderCracker
 
-class SliderCrack:
-    def __init__(self, url, cookie):
-        option = webdriver.ChromeOptions()
-        option.add_argument("user-data-dir=D:\python-3.7.8\profile")
-        self.url = url 
-        self.browser = webdriver.Chrome(chrome_options=option)
-        self.cookie = cookie
-        # 为打开的网页添加cookie
-        # self.browser.add_cookie(cookie)
-        self.wait = WebDriverWait(self.browser, 20)
-
-    def execute(self):
-        self.browser.get(self.url) 
-        # button = self.get_geetest_button()
-        # button.click()
-        self.browser.close()
-
-    # # 模拟点击
-    # def get_geetest_button(self):
-    #     button = self.wait.until(EC.element_to_be_clickable((By.CLASS_NAME, "geetest_slider_button")))
-    #     return button
-
-    def get_slider(self):
-        """
-        获取滑块
-        返回：滑块对象
-        """
-        slider = self.wait.until(EC.element_to_be_clickable((By.CLASS_NAME, 'geetest_slider_button')))
-        return slider
-
-    # 识别缺口
-    def get_position(self):
-        """
-        获取验证码位置
-        返回：验证码位置元组
-        """
-        img = self.wait.until(EC.presence_of_element_located(By.CLASS_NAME, 'geetest_canvas_bg geetest_absolute'))
-        time.sleep(2)
-        location = img.location
-        size = img.size
-        top, bottom, left, right = location['y'], location['y'] + size['height'], location['x'], location['x'] + size['width']
-        return (top, bottom, left, right)
-
-    def get_geetest_image(self, name = 'captcha.png'):
-        """
-        获取验证码图片
-        返回：图片对象
-        """
-        top, bottom, left, right = self.get_position()
-        print('验证码位置: ', top, bottom, left, right)
-        screenshot = self.get_screenshot()
-        captcha = screenshot.crop((left, top, right, bottom))
-        return captcha
-
-    def get_image_info(self):
-        pass
-
-
-class Spider:
+class SingleSpider:
     def __init__(self, url, cookie, mutex):
         self.url = url
         self.cookie = cookie.encode('utf-8').decode('latin1')
         self.mutex = mutex
+        self.session = requests.Session()
+        self.headers = self._GetUserAgent()
+        self.headers["cookie"] = cookie
+        # self.session.cookies.set_cookie({"cookie": cookie})
+        self.session.headers.update(self.headers)
     
     def _GetUserAgent(self):
         user_agent_list = [
@@ -118,38 +59,28 @@ class Spider:
             sys.exit(-1)
 
 
-    async def Deep_Search(self, id):
+    def Deep_Search(self, id):
         url = "https://www.jiayuan.com/{}?fxly=search_v2".format(id)
-        headers = self._GetUserAgent()
-        headers['cookie'] = self.cookie
-        headers['referer'] = url
-        retry_count = 5
         names = ['education', 'height', 'car', 'income', 'house', 'weight', 'constellation', 'nationality', 'zodiac', 'blood']
-        while retry_count > 0:
+        response = self.session.get(url)
+        if response.status_code == 200:
+            html = BeautifulSoup(response.text, 'html.parser')
             try:
-                # proxy = self._GetProxy()
-                # proxies = {'http': 'http://' + proxy}
-                response = requests.get(url, headers=headers)
-                if response.status_code == 200:
-                    html = BeautifulSoup(response.text, 'html.parser')
-                    try:
-                        results = html.find("ul", class_ = "member_info_list fn-clear").find_all('em')
-                        pattern = r"<.*?>(.*?)<.*?>"
-                        details = {}
-                        for (index, item) in enumerate(results):
-                            info = re.findall(pattern, str(item)).pop()
-                            details[names[index]] = info
-                        return details
-                    except AttributeError:
-                        sys.exit(-1)
-                        # return {k: '--' for k in names}
-                else:
-                    sys.exit(-1)
-            except Exception:
-                retry_count -= 1
-        return {k: '--' for k in names}
+                results = html.find("ul", class_ = "member_info_list fn-clear").find_all('em')
+                pattern = r"<.*?>(.*?)<.*?>"
+                details = {}
+                for (index, item) in enumerate(results):
+                    info = re.findall(pattern, str(item)).pop()
+                    details[names[index]] = info
+                print(details)
+                return details
+            except AttributeError:
+                print("[Error] 被屏蔽了")
+                slider_cracker = SliderCracker(url)
+                slider_cracker.crack()
+                sys.exit(-1)
 
-    async def Req(self, page: int):
+    def Req(self, page: int):
         payload = [
             ('sex', 'f'),
             ('key', ''), 
@@ -162,11 +93,7 @@ class Spider:
             ('pri_uid', '254091710'),
             ('jsversion', 'v5')
         ]
-        headers = self._GetUserAgent()
-        # proxy = self._GetProxy()
-        # proxies = {'http': 'http://' + proxy}
-        headers['cookie'] = self.cookie
-        response = requests.post(url = self.url, headers=headers, data=payload)
+        response = self.session.post(url = self.url, data=payload)
         if response.status_code == 200:
             print('成功获取数据')
             data = response.text[11:]
@@ -183,23 +110,25 @@ class Spider:
     
     def Extarct(self, data):
         extract_data = []
-        keys = ['uid', 'realUid', 'nickname', 'sex', 'marriage', 'height', 'education', 'income', 'work_location', 'image', "randListTag", "randTag", "shortnote"]
+        keys = ['uid', 'nickname', 'sex', 'marriage', 'height', 'education', 'income', 'work_location', 'image', "randListTag", "randTag", "shortnote"]
         user_info = data['userInfo']
         for item in user_info:
             extract_item = {}
             for k, v in item.items():
                 if k == 'uid' and v == 253091710:
                     return None
+                elif k == 'realUid':
+                    details = self.Deep_Search(v)
+                    extract_item = dict(extract_item, **details)
                 elif k in keys:
                     filter_value = re.compile(r'<[^>]+>', re.S)
                     filter_value = filter_value.sub(' ', str(v))
-                    # print(filter_value)
                     extract_item[k] = filter_value
             extract_data.append(extract_item)
         return extract_data
 
     
-    async def StoreCsv(self, filename, data):
+    def StoreCsv(self, filename, data):
         with open(filename, 'a+', encoding='utf-8') as f:
             csv_writer = csv.writer(f)
             for item in data:
@@ -208,34 +137,32 @@ class Spider:
                 csv_writer.writerow(info)
                 self.mutex.release()
 
-    async def Run(self, page: int):
-        req_task = asyncio.create_task(self.Req(page))
-        data = await req_task
+    def Run(self, page: int):
+        data = self.Req(page)
         if len(data) == 0:
             return 
         else:
             flush_data = self.Extarct(data)
-            # print(flush_data)
-            write_task = asyncio.create_task(self.StoreCsv("data.csv", flush_data))
-            await write_task
+            # self.StoreCsv("data1.csv", flush_data)
 
-async def main():
+def main():
     url = 'https://search.jiayuan.com/v2/search_v2.php'
     cookie_txt = open('cookie.txt', mode='r')
     cookie = cookie_txt.read()
     cookie_txt.close()
     mutex = Lock()
     title = ['用户 id', '真实的用户 id', '昵称', '性别', '婚姻状况', '身高', '受教育程度', '收入', '工作地点', '图片', "随机返回的标签列表", "随机返回的标签", "简介"]
-    with open("data.csv", 'a+', encoding='utf-8') as f:
-        csv_writer = csv.writer(f)
-        csv_writer.writerow(title)
+    # with open("data.csv", 'a+', encoding='utf-8') as f:
+    #     csv_writer = csv.writer(f)
+    #     csv_writer.writerow(title)
     for page in range(1, 500):
-        spider = Spider(url, cookie, mutex)
-        task = asyncio.create_task(spider.Run(page))
-        await task
+        spider = SingleSpider(url, cookie, mutex)
+        spider.Run(page)
+    # spider = SingleSpider(url, cookie, mutex)
+    # spider.Run(1)
 
 if __name__ == '__main__':
-    asyncio.run(main())
+    main()
 
 
 
