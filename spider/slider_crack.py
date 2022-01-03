@@ -3,9 +3,12 @@ from io import BytesIO
 from PIL import Image
 from selenium import webdriver
 from selenium.webdriver import ActionChains
+from selenium.webdriver.common import action_chains
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+import base64
+import io
 
 EMAIL = 'cqc@cuiqingcai.com'
 PASSWORD = ''
@@ -39,12 +42,13 @@ class SliderCracker():
         获取验证码位置
         :return: 验证码位置元组
         """
-        img = self.wait.until(EC.presence_of_element_located((By.CLASS_NAME, 'ggeetest_canvas_bg')))
+        img = self.wait.until(EC.presence_of_element_located((By.CLASS_NAME, 'geetest_window')))
         time.sleep(2)
         location = img.location
         size = img.size
         top, bottom, left, right = location['y'], location['y'] + size['height'], location['x'], location['x'] + size[
             'width']
+        print("top: {}, bottom: {}, left: {}, right: {}".format(top, bottom, left, right))
         return (top, bottom, left, right)
     
     def get_screenshot(self):
@@ -137,10 +141,10 @@ class SliderCracker():
         while current < distance:
             if current < mid:
                 # 加速度为正2
-                a = 2
+                a = 10
             else:
                 # 加速度为负3
-                a = -3
+                a = -10
             # 初速度v0
             v0 = v
             # 当前速度v = v0 + at
@@ -148,9 +152,15 @@ class SliderCracker():
             # 移动距离x = v0t + 1/2 * a * t^2
             move = v0 * t + 1 / 2 * a * t * t
             # 当前位移
-            current += move
+            if current + move < distance:
+                track.append(round(move))
+                current += move
+            else:
+                track.append(round(distance - current))
+                current = distance
             # 加入轨迹
-            track.append(round(move))
+            # track.append(round(move))
+        # track.append(round(distance))
         return track
     
     def move_to_gap(self, slider, track):
@@ -165,28 +175,56 @@ class SliderCracker():
             ActionChains(self.browser).move_by_offset(xoffset=x, yoffset=0).perform()
         time.sleep(0.5)
         ActionChains(self.browser).release().perform()
-    
-    def login(self):
-        """
-        登录
-        :return: None
-        """
-        submit = self.wait.until(EC.element_to_be_clickable((By.CLASS_NAME, 'login-btn')))
-        submit.click()
-        time.sleep(10)
-        print('登录成功')
+
+
+    # 获取到完整的图片
+    def get_full_img(self):
+        image_ori = self.browser.execute_script('return document.getElementsByClassName("geetest_canvas_fullbg")[0].toDataURL("image/png")')
+        image_ori = image_ori.split(',')[1]
+        image_ori = base64.b64decode(image_ori)
+        image_ori = Image.open(io.BytesIO(image_ori))
+        image_ori.save("captcha1.png")
+        return image_ori
+
+    # 获取到带有缺口的图片
+    def get_crack_img(self):
+        image_gap = self.browser.execute_script('return document.getElementsByClassName("geetest_canvas_bg")[0].toDataURL("image/png")')
+        image_gap = image_gap.split(',')[1]
+        image_gap = base64.b64decode(image_gap)
+        image_gap = Image.open(io.BytesIO(image_gap))
+        image_gap.save("captcha2.png")
+        return image_gap
+
+    def simulate_slide(self, slider, target_offset_x):
+        # action_chains = webdriver.ActionChains(self.browser)
+        # action_chains.click_and_hold(source).perform()
+        ActionChains(self.browser).click_and_hold(slider).perform()
+        ActionChains(self.browser).pause(0.2)
+        ActionChains(self.browser).move_by_offset(xoffset=target_offset_x - 10, yoffset=0).perform()
+        ActionChains(self.browser).pause(0.2)
+        ActionChains(self.browser).move_by_offset(10, yoffset=0).perform()
+        ActionChains(self.browser).pause(0.6)
+        ActionChains(self.browser).release().perform()
+        
+        # action_chains = ActionChains(self.browser).click_and_hold(slider).perform()
+        # action_chains.pause(0.2)
+        # action_chains.move_by_offset(target_offset_x - 10, 0)
+        # action_chains.pause(0.6)
+        # action_chains.move_by_offset(10, 0)
+        # action_chains.pause(0.6)
+        # action_chains.release()
+        # action_chains.perform()
     
     def crack(self):
         # 输入用户名密码
         self.open()
-        # time.sleep(2)
-        # 获取验证码图片
-        image1 = self.get_geetest_image('captcha1.png')
-        # 点按呼出缺口
+        time.sleep(2)
+        # 获取滑动按钮
         slider = self.get_slider()
-        slider.click()
-        # 获取带缺口的验证码图片
-        image2 = self.get_geetest_image('captcha2.png')
+        # 获取到没有缺口的图片
+        image1 = self.get_full_img()
+        # 获取到带有缺口的图片
+        image2 = self.get_crack_img()
         # 获取缺口位置
         gap = self.get_gap(image1, image2)
         print('缺口位置', gap)
@@ -196,7 +234,8 @@ class SliderCracker():
         track = self.get_track(gap)
         print('滑动轨迹', track)
         # 拖动滑块
-        self.move_to_gap(slider, track)
+        # self.move_to_gap(slider, track)
+        self.simulate_slide(slider, gap)
         
         success = self.wait.until(
             EC.text_to_be_present_in_element((By.CLASS_NAME, 'geetest_success_radar_tip_content'), '验证成功'))
