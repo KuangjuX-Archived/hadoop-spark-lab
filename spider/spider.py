@@ -189,7 +189,7 @@ class Spider:
             extract_item = {}
             for k, v in item.items():
                 if k == 'uid' and v == 253091710:
-                    continue
+                    return None
                 elif k in keys:
                     filter_value = re.compile(r'<[^>]+>', re.S)
                     filter_value = filter_value.sub(' ', str(v))
