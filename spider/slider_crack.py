@@ -9,6 +9,8 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 import base64
 import io
+import track
+import random
 
 EMAIL = 'cqc@cuiqingcai.com'
 PASSWORD = ''
@@ -156,12 +158,13 @@ class SliderCracker():
                 track.append(round(move))
                 current += move
             else:
-                track.append(round(distance - current))
-                current = distance
+                track.append(round(distance - current + 1))
+                current = distance + random.randint(0,4)
             # 加入轨迹
-            # track.append(round(move))
         # track.append(round(distance))
         return track
+
+        
     
     def move_to_gap(self, slider, track):
         """
@@ -173,7 +176,7 @@ class SliderCracker():
         ActionChains(self.browser).click_and_hold(slider).perform()
         for x in track:
             ActionChains(self.browser).move_by_offset(xoffset=x, yoffset=0).perform()
-        time.sleep(0.5)
+        time.sleep(0.05)
         ActionChains(self.browser).release().perform()
 
 
@@ -195,16 +198,16 @@ class SliderCracker():
         image_gap.save("captcha2.png")
         return image_gap
 
-    def simulate_slide(self, slider, target_offset_x):
-        # action_chains = webdriver.ActionChains(self.browser)
-        # action_chains.click_and_hold(source).perform()
-        ActionChains(self.browser).click_and_hold(slider).perform()
-        ActionChains(self.browser).pause(0.2)
-        ActionChains(self.browser).move_by_offset(xoffset=target_offset_x - 10, yoffset=0).perform()
-        ActionChains(self.browser).pause(0.2)
-        ActionChains(self.browser).move_by_offset(10, yoffset=0).perform()
-        ActionChains(self.browser).pause(0.6)
-        ActionChains(self.browser).release().perform()
+    # def simulate_slide(self, slider, target_offset_x):
+    #     # action_chains = webdriver.ActionChains(self.browser)
+    #     # action_chains.click_and_hold(source).perform()
+    #     ActionChains(self.browser).click_and_hold(slider).perform()
+    #     ActionChains(self.browser).pause(0.2)
+    #     ActionChains(self.browser).move_by_offset(xoffset=target_offset_x - 10, yoffset=0).perform()
+    #     ActionChains(self.browser).pause(0.2)
+    #     ActionChains(self.browser).move_by_offset(10, yoffset=0).perform()
+    #     ActionChains(self.browser).pause(0.6)
+    #     ActionChains(self.browser).release().perform()
         
         # action_chains = ActionChains(self.browser).click_and_hold(slider).perform()
         # action_chains.pause(0.2)
@@ -234,8 +237,8 @@ class SliderCracker():
         track = self.get_track(gap)
         print('滑动轨迹', track)
         # 拖动滑块
-        # self.move_to_gap(slider, track)
-        self.simulate_slide(slider, gap)
+        self.move_to_gap(slider, track)
+        # self.simulate_slide(slider, gap)
         
         success = self.wait.until(
             EC.text_to_be_present_in_element((By.CLASS_NAME, 'geetest_success_radar_tip_content'), '验证成功'))
