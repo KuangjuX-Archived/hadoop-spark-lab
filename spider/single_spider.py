@@ -77,8 +77,8 @@ class SingleSpider:
             except AttributeError:
                 print("[Error] 被屏蔽了")
                 slider_cracker = SliderCracker(url)
-                slider_cracker.crack()
-                sys.exit(-1)
+                slider_cracker.crack()          
+                return self.Deep_Search(id)
 
     def Req(self, page: int):
         payload = [

@@ -31,36 +31,6 @@ class SliderCracker():
     def __del__(self):
         self.browser.close()
     
-    def get_geetest_button(self):
-        """
-        获取初始验证按钮
-        :return:
-        """
-        button = self.wait.until(EC.element_to_be_clickable((By.CLASS_NAME, 'geetest_radar_tip')))
-        return button
-    
-    def get_position(self):
-        """
-        获取验证码位置
-        :return: 验证码位置元组
-        """
-        img = self.wait.until(EC.presence_of_element_located((By.CLASS_NAME, 'geetest_window')))
-        time.sleep(2)
-        location = img.location
-        size = img.size
-        top, bottom, left, right = location['y'], location['y'] + size['height'], location['x'], location['x'] + size[
-            'width']
-        print("top: {}, bottom: {}, left: {}, right: {}".format(top, bottom, left, right))
-        return (top, bottom, left, right)
-    
-    def get_screenshot(self):
-        """
-        获取网页截图
-        :return: 截图对象
-        """
-        screenshot = self.browser.get_screenshot_as_png()
-        screenshot = Image.open(BytesIO(screenshot))
-        return screenshot
     
     def get_slider(self):
         """
@@ -70,17 +40,6 @@ class SliderCracker():
         slider = self.wait.until(EC.element_to_be_clickable((By.CLASS_NAME, 'geetest_slider_button')))
         return slider
     
-    def get_geetest_image(self, name='captcha.png'):
-        """
-        获取验证码图片
-        :return: 图片对象
-        """
-        top, bottom, left, right = self.get_position()
-        print('验证码位置', top, bottom, left, right)
-        screenshot = self.get_screenshot()
-        captcha = screenshot.crop((left, top, right, bottom))
-        captcha.save(name)
-        return captcha
     
     def open(self):
         """
@@ -123,63 +82,6 @@ class SliderCracker():
         else:
             return False
     
-    def get_track(self, distance):
-        """
-        根据偏移量获取移动轨迹
-        :param distance: 偏移量
-        :return: 移动轨迹
-        """
-        # 移动轨迹
-        track = []
-        # 当前位移
-        current = 0
-        # 减速阈值
-        mid = distance * 4 / 5
-        # 计算间隔
-        t = 0.2
-        # 初速度
-        v = 0
-        
-        while current < distance:
-            if current < mid:
-                # 加速度为正2
-                a = 10
-            else:
-                # 加速度为负3
-                a = -10
-            # 初速度v0
-            v0 = v
-            # 当前速度v = v0 + at
-            v = v0 + a * t
-            # 移动距离x = v0t + 1/2 * a * t^2
-            move = v0 * t + 1 / 2 * a * t * t
-            # 当前位移
-            if current + move < distance:
-                track.append(round(move))
-                current += move
-            else:
-                track.append(round(distance - current + 1))
-                current = distance + random.randint(0,4)
-            # 加入轨迹
-        # track.append(round(distance))
-        return track
-
-        
-    
-    def move_to_gap(self, slider, track):
-        """
-        拖动滑块到缺口处
-        :param slider: 滑块
-        :param track: 轨迹
-        :return:
-        """
-        ActionChains(self.browser).click_and_hold(slider).perform()
-        for x in track:
-            ActionChains(self.browser).move_by_offset(xoffset=x, yoffset=0).perform()
-        time.sleep(0.05)
-        ActionChains(self.browser).release().perform()
-
-
     # 获取到完整的图片
     def get_full_img(self):
         image_ori = self.browser.execute_script('return document.getElementsByClassName("geetest_canvas_fullbg")[0].toDataURL("image/png")')
@@ -190,7 +92,7 @@ class SliderCracker():
         return image_ori
 
     # 获取到带有缺口的图片
-    def get_crack_img(self):
+    def get_geetest_img(self):
         image_gap = self.browser.execute_script('return document.getElementsByClassName("geetest_canvas_bg")[0].toDataURL("image/png")')
         image_gap = image_gap.split(',')[1]
         image_gap = base64.b64decode(image_gap)
@@ -198,25 +100,54 @@ class SliderCracker():
         image_gap.save("captcha2.png")
         return image_gap
 
-    # def simulate_slide(self, slider, target_offset_x):
-    #     # action_chains = webdriver.ActionChains(self.browser)
-    #     # action_chains.click_and_hold(source).perform()
-    #     ActionChains(self.browser).click_and_hold(slider).perform()
-    #     ActionChains(self.browser).pause(0.2)
-    #     ActionChains(self.browser).move_by_offset(xoffset=target_offset_x - 10, yoffset=0).perform()
-    #     ActionChains(self.browser).pause(0.2)
-    #     ActionChains(self.browser).move_by_offset(10, yoffset=0).perform()
-    #     ActionChains(self.browser).pause(0.6)
-    #     ActionChains(self.browser).release().perform()
-        
-        # action_chains = ActionChains(self.browser).click_and_hold(slider).perform()
-        # action_chains.pause(0.2)
-        # action_chains.move_by_offset(target_offset_x - 10, 0)
-        # action_chains.pause(0.6)
-        # action_chains.move_by_offset(10, 0)
-        # action_chains.pause(0.6)
-        # action_chains.release()
-        # action_chains.perform()
+    def __get_random_pause_scondes(self):
+        return random.uniform(0.6, 0.9)
+
+    def simulate_slide(self, slider, target_offset_x):
+        """
+        模仿人的拖拽动作：快速沿着X轴拖动（存在误差），再暂停，然后修正误差
+        防止被检测为机器人，出现“图片被怪物吃掉了”等验证失败的情况
+        :param source:要拖拽的html元素
+        :param targetOffsetX: 拖拽目标x轴距离
+        :return: None
+        """
+        action_chains = webdriver.ActionChains(self.browser)
+        # 点击，准备拖拽
+        action_chains.click_and_hold(slider)
+        # 拖动次数，二到三次
+        dragCount = random.randint(2, 3)
+        if dragCount == 2:
+            # 总误差值
+            sumOffsetx = random.randint(-15, 15)
+            action_chains.move_by_offset(target_offset_x + sumOffsetx, 0)
+            # 暂停一会
+            action_chains.pause(self.__get_random_pause_scondes())
+            # 修正误差，防止被检测为机器人，出现图片被怪物吃掉了等验证失败的情况
+            action_chains.move_by_offset(-sumOffsetx, 0)
+        elif dragCount == 3:
+            # 总误差值
+            sumOffsetx = random.randint(-15, 15)
+            action_chains.move_by_offset(target_offset_x + sumOffsetx, 0)
+            # 暂停一会
+            action_chains.pause(self.__get_random_pause_scondes())
+
+            # 已修正误差的和
+            fixedOffsetX = 0
+            # 第一次修正误差
+            if sumOffsetx < 0:
+                offsetx = random.randint(sumOffsetx, 0)
+            else:
+                offsetx = random.randint(0, sumOffsetx)
+
+            fixedOffsetX = fixedOffsetX + offsetx
+            action_chains.move_by_offset(-offsetx, 0)
+            action_chains.pause(self.__get_random_pause_scondes())
+
+            # 最后一次修正误差
+            action_chains.move_by_offset(-sumOffsetx + fixedOffsetX, 0)
+            action_chains.pause(self.__get_random_pause_scondes())
+        action_chains.release().perform()
+    
     
     def crack(self):
         # 输入用户名密码
@@ -227,25 +158,21 @@ class SliderCracker():
         # 获取到没有缺口的图片
         image1 = self.get_full_img()
         # 获取到带有缺口的图片
-        image2 = self.get_crack_img()
+        image2 = self.get_geetest_img()
         # 获取缺口位置
         gap = self.get_gap(image1, image2)
         print('缺口位置', gap)
         # 减去缺口位移
         gap -= BORDER
-        # 获取移动轨迹
-        track = self.get_track(gap)
-        print('滑动轨迹', track)
-        # 拖动滑块
-        self.move_to_gap(slider, track)
-        # self.simulate_slide(slider, gap)
+        # 模拟人类滑动滑块
+        self.simulate_slide(slider, gap)
         
-        success = self.wait.until(
-            EC.text_to_be_present_in_element((By.CLASS_NAME, 'geetest_success_radar_tip_content'), '验证成功'))
-        print(success)
+        error = self.wait.until(
+            EC.text_to_be_present_in_element((By.CLASS_NAME, 'geetest_panel_error_code_text'), '113'))
+        print(error)
         
         # 失败后重试
-        if not success:
+        if error:
             self.crack()
         else:
             self.login()
