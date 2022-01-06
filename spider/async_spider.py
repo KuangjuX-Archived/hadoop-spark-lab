@@ -224,10 +224,10 @@ async def main():
     cookie = cookie_txt.read()
     cookie_txt.close()
     mutex = Lock()
-    title = ['用户 id', '真实的用户 id', '昵称', '性别', '婚姻状况', '身高', '受教育程度', '收入', '工作地点', '图片', "随机返回的标签列表", "随机返回的标签", "简介"]
-    with open("data.csv", 'a+', encoding='utf-8') as f:
-        csv_writer = csv.writer(f)
-        csv_writer.writerow(title)
+    # title = ['用户 id', '真实的用户 id', '昵称', '性别', '婚姻状况', '身高', '受教育程度', '收入', '工作地点', '图片', "随机返回的标签列表", "随机返回的标签", "简介"]
+    # with open("data.csv", 'a+', encoding='utf-8') as f:
+    #     csv_writer = csv.writer(f)
+    #     csv_writer.writerow(title)
     for page in range(1, 500):
         spider = AsyncSpider(url, cookie, mutex)
         task = asyncio.create_task(spider.Run(page))

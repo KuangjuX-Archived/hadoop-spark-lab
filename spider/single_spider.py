@@ -8,20 +8,21 @@ import re
 from bs4 import BeautifulSoup
 from json.decoder import JSONDecodeError
 from threading import Lock
+
+from selenium import webdriver
 from slider_crack import SliderCracker
 
 class SingleSpider:
-    def __init__(self, url, cookie, mutex):
+    def __init__(self, login_url, url, username, password, mutex):
         self.url = url
-        self.cookie = cookie.encode('utf-8').decode('latin1')
+        self.login_url = login_url
+        self.username = username
+        self.password = password
         self.mutex = mutex
         self.session = requests.Session()
-        self.headers = self._GetUserAgent()
-        self.headers["cookie"] = cookie
-        # self.session.cookies.set_cookie({"cookie": cookie})
-        self.session.headers.update(self.headers)
+        self.headers = self.__get_user_agent()
     
-    def _GetUserAgent(self):
+    def __get_user_agent(self):
         user_agent_list = [
             'Mozilla/5.0 (X11; U; Linux i686; en-US; rv:1.9.0.8) Gecko Fedora/1.9.0.8-1.fc10 Kazehakase/0.5.6',
             'Mozilla/5.0 (X11; Linux i686; U;) Gecko/20070322 Kazehakase/0.4.5',
@@ -50,7 +51,7 @@ class SingleSpider:
         }
         return headers
 
-    def _GetProxy(self):
+    def __get_proxy(self):
         try:
             proxy = requests.get("http://127.0.0.1:5555/random").text.strip()
             return proxy
@@ -59,7 +60,7 @@ class SingleSpider:
             sys.exit(-1)
 
 
-    def Deep_Search(self, id):
+    def __deep_search(self, id):
         url = "https://www.jiayuan.com/{}?fxly=search_v2".format(id)
         names = ['education', 'height', 'car', 'income', 'house', 'weight', 'constellation', 'nationality', 'zodiac', 'blood']
         response = self.session.get(url)
@@ -77,10 +78,10 @@ class SingleSpider:
             except AttributeError:
                 print("[Error] 被屏蔽了")
                 slider_cracker = SliderCracker(url)
-                slider_cracker.crack()          
-                return self.Deep_Search(id)
+                slider_cracker.crack()     
+                return self.__deep_search(id)     
 
-    def Req(self, page: int):
+    def req(self, page: int):
         payload = [
             ('sex', 'f'),
             ('key', ''), 
@@ -100,15 +101,16 @@ class SingleSpider:
             data = data[:-13]
             try:
                 data = json.loads(data)
+                return data
             except JSONDecodeError:
                 print('[Error] JsonDecodeError in page {}'.format(page))
-                data = []
-            return data
+            return None
         else:
             print('失败获取数据')
             sys.exit(-1)
     
-    def Extarct(self, data):
+    # 提取用户信息并从个人主页中拿到更加详细的个人信息
+    def extarct(self, data):
         extract_data = []
         keys = ['uid', 'nickname', 'sex', 'marriage', 'height', 'education', 'income', 'work_location', 'image', "randListTag", "randTag", "shortnote"]
         user_info = data['userInfo']
@@ -116,9 +118,10 @@ class SingleSpider:
             extract_item = {}
             for k, v in item.items():
                 if k == 'uid' and v == 253091710:
-                    return None
+                    continue
                 elif k == 'realUid':
-                    details = self.Deep_Search(v)
+                    # 爬取用户更详细的信息
+                    details = self.__deep_search(v)
                     extract_item = dict(extract_item, **details)
                 elif k in keys:
                     filter_value = re.compile(r'<[^>]+>', re.S)
@@ -128,7 +131,7 @@ class SingleSpider:
         return extract_data
 
     
-    def StoreCsv(self, filename, data):
+    def store_csv(self, filename, data):
         with open(filename, 'a+', encoding='utf-8') as f:
             csv_writer = csv.writer(f)
             for item in data:
@@ -137,29 +140,32 @@ class SingleSpider:
                 csv_writer.writerow(info)
                 self.mutex.release()
 
-    def Run(self, page: int):
-        data = self.Req(page)
-        if len(data) == 0:
+    def run(self, page: int):
+        data = self.req(page)
+        if data == None:
             return 
         else:
-            flush_data = self.Extarct(data)
-            # self.StoreCsv("data1.csv", flush_data)
+            flush_data = self.extarct(data)
+            print(flush_data)
+            self.store_csv("new_data.csv", flush_data)
 
 def main():
+    login_url = "https://login.jiayuan.com/"
     url = 'https://search.jiayuan.com/v2/search_v2.php'
-    cookie_txt = open('cookie.txt', mode='r')
-    cookie = cookie_txt.read()
-    cookie_txt.close()
     mutex = Lock()
-    title = ['用户 id', '真实的用户 id', '昵称', '性别', '婚姻状况', '身高', '受教育程度', '收入', '工作地点', '图片', "随机返回的标签列表", "随机返回的标签", "简介"]
+    # title = ['用户 id', '真实的用户 id', '昵称', '性别', '婚姻状况', '身高', '受教育程度', '收入', '工作地点', '图片', "随机返回的标签列表", "随机返回的标签", "简介"]
     # with open("data.csv", 'a+', encoding='utf-8') as f:
     #     csv_writer = csv.writer(f)
     #     csv_writer.writerow(title)
-    for page in range(1, 500):
-        spider = SingleSpider(url, cookie, mutex)
-        spider.Run(page)
-    # spider = SingleSpider(url, cookie, mutex)
-    # spider.Run(1)
+    account = open("account.txt", "r")
+    username = account.readline()
+    password = account.readline()
+    account.close()
+    print("您的用户名是: {}".format(username))
+    print("您的密码是: {}".format(password))
+    spider = SingleSpider(login_url, url, username, password, mutex)
+    for page in range(30, 100):
+        spider.run(page)
 
 if __name__ == '__main__':
     main()

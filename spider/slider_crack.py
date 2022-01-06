@@ -2,6 +2,7 @@ import time
 from io import BytesIO
 from PIL import Image
 from selenium import webdriver
+from selenium.common.exceptions import TimeoutException
 from selenium.webdriver import ActionChains
 from selenium.webdriver.common import action_chains
 from selenium.webdriver.common.by import By
@@ -12,10 +13,8 @@ import io
 import track
 import random
 
-EMAIL = 'cqc@cuiqingcai.com'
-PASSWORD = ''
+
 BORDER = 6
-INIT_LEFT = 60
 
 
 class SliderCracker():
@@ -25,7 +24,7 @@ class SliderCracker():
         options.add_experimental_option('excludeSwitches', ['enable-logging'])
         self.url = url
         self.browser = webdriver.Chrome(options = options)
-        self.wait = WebDriverWait(self.browser, 20)
+        self.wait = WebDriverWait(self.browser, 3)
         
     # 自动关闭浏览器
     def __del__(self):
@@ -47,6 +46,11 @@ class SliderCracker():
         :return: None
         """
         self.browser.get(self.url)
+        # self.browser.delete_all_cookies()
+
+        # for cookie in self.cookies:
+        #     if cookie['domain'] == '.jiayuan.com':
+        #         self.browser.add_cookie(cookie)
     
     def get_gap(self, image1, image2):
         """
@@ -147,8 +151,19 @@ class SliderCracker():
             action_chains.move_by_offset(-sumOffsetx + fixedOffsetX, 0)
             action_chains.pause(self.__get_random_pause_scondes())
         action_chains.release().perform()
+
+    # 模拟登陆账户，不过并没用上
+    def login(self):
+        account = open("account.txt", "r")
+        username = account.readline()
+        password = account.readline()
+        account.close()
+        self.wait.until(EC.presence_of_element_located((By.ID, "login_email_new")))
+        self.browser.find_element_by_id('login_email_new').send_keys(username)
+        self.browser.find_element_by_id('login_password_new').send_keys(password)
+        self.browser.find_element_by_class_name('login_btn').click()
     
-    
+    # 破解验证码
     def crack(self):
         # 输入用户名密码
         self.open()
@@ -167,15 +182,19 @@ class SliderCracker():
         # 模拟人类滑动滑块
         self.simulate_slide(slider, gap)
         
-        error = self.wait.until(
-            EC.text_to_be_present_in_element((By.CLASS_NAME, 'geetest_panel_error_code_text'), '113'))
-        print(error)
-        
-        # 失败后重试
-        if error:
-            self.crack()
-        else:
-            self.login()
+        try:
+            # 首先验证是否是被识别为爬虫，若被识别为爬虫，则重新验证
+            err1 = self.wait.until(EC.text_to_be_present_in_element((By.CLASS_NAME, 'geetest_panel_error_code_text'), '113'))
+            if err1:
+                self.crack()
+        except TimeoutException:
+            # 验证是否位置不对，如果位置不对的话则重新开始验证
+            try:
+                err2 = self.wait.until(EC.text_to_be_present_in_element((By.CLASS_NAME, 'geetest_result_content'), '请正确拼合图像'))
+                if err2:
+                    self.crack()
+            except TimeoutException:
+                return
 
 
     
