@@ -10,68 +10,7 @@ import asyncio
 import threading
 from json.decoder import JSONDecodeError
 from threading import Lock
-from selenium import webdriver
-from selenium.webdriver.common.action_chains import ActionChains
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.common.by import By
 
-class SliderCrack:
-    def __init__(self, url, cookie):
-        option = webdriver.ChromeOptions()
-        option.add_argument("user-data-dir=D:\python-3.7.8\profile")
-        self.url = url 
-        self.browser = webdriver.Chrome(chrome_options=option)
-        self.cookie = cookie
-        # 为打开的网页添加cookie
-        # self.browser.add_cookie(cookie)
-        self.wait = WebDriverWait(self.browser, 20)
-
-    def execute(self):
-        self.browser.get(self.url) 
-        # button = self.get_geetest_button()
-        # button.click()
-        self.browser.close()
-
-    # # 模拟点击
-    # def get_geetest_button(self):
-    #     button = self.wait.until(EC.element_to_be_clickable((By.CLASS_NAME, "geetest_slider_button")))
-    #     return button
-
-    def get_slider(self):
-        """
-        获取滑块
-        返回：滑块对象
-        """
-        slider = self.wait.until(EC.element_to_be_clickable((By.CLASS_NAME, 'geetest_slider_button')))
-        return slider
-
-    # 识别缺口
-    def get_position(self):
-        """
-        获取验证码位置
-        返回：验证码位置元组
-        """
-        img = self.wait.until(EC.presence_of_element_located(By.CLASS_NAME, 'geetest_canvas_bg geetest_absolute'))
-        time.sleep(2)
-        location = img.location
-        size = img.size
-        top, bottom, left, right = location['y'], location['y'] + size['height'], location['x'], location['x'] + size['width']
-        return (top, bottom, left, right)
-
-    def get_geetest_image(self, name = 'captcha.png'):
-        """
-        获取验证码图片
-        返回：图片对象
-        """
-        top, bottom, left, right = self.get_position()
-        print('验证码位置: ', top, bottom, left, right)
-        screenshot = self.get_screenshot()
-        captcha = screenshot.crop((left, top, right, bottom))
-        return captcha
-
-    def get_image_info(self):
-        pass
 
 
 class AsyncSpider:

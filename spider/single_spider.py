@@ -45,6 +45,11 @@ class SingleSpider:
             'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/61.0.3163.100 Safari/537.36'
         ]
 
+        headers = {
+            "User-Agent" : random.choice(user_agent_list),\
+        }
+        return headers
+
     # 获取代理 ip 地址
     def __get_proxy(self):
         try:
@@ -62,8 +67,18 @@ class SingleSpider:
             print('[Error] Fail to request url')
             return None
 
-    def run(self, page: int):
-        print('[Debug] Spider will work on page {}'.format(page))
+    def persist(self, filename, data):
+        with open(filename, 'a+', encoding='utf-8') as f:
+            csv_writer = csv.writer(f)
+            if data == None:
+                return 
+            else:
+                for item in data:
+                    info = [str(v) for v in item.values()]
+                    csv_writer.writerow(info)
+
+    def run(self):
+        pass
 
 # 世纪佳缘爬虫的具体类
 class JSpider(SingleSpider):
@@ -142,21 +157,91 @@ class JSpider(SingleSpider):
 
 
 class ZSpider(SingleSpider):
-    def req(self, page, payload):
-        data = super(ZSpider, self).req(payload)
-        if data == None:
-            return None
+    def req(self, url, page):
+        url += "/"
+        url += str(page)
+        print("[Debug] Request URL: {}".format(url))
+        response = requests.get(url = url, headers = self.headers)
+        if response.status_code == 200:
+            return response.text
         else:
-            try:
-                data = json.loads(data)
-                return data
-            except JSONDecodeError:
-                print('[Error] Json decode error in page {}'.format(page))
-                return None
+            print("[Error] Fail to request url: {}".format(url))
 
-    def run(self, page, payload):
-        super(ZSpider, self).run(page)
-        data = self.req(page, payload)
-        print(data)
+
+    # 解析页面
+    def parse(self, data):
+        if data != None:
+            html = BeautifulSoup(data, 'html.parser')
+            try:
+                results = html.find("div", class_ = "g-list").find_all("div", class_ = "list-item")
+                album_pattern = r'<a href="(.*?)" target=.*?">'
+                img_pattern = r'<img.*?src="(.*?)"/>'
+                location_pattern = r'居住地：</span>(.*?)</td>'
+                sex_pattern = r'性别：</span>(.*?)</td>'
+                marriage_pattern = r'婚况：</span>(.*?)</td>'
+                height_pattern = r'<span class="grayL">.*?高：</span>(.*?)</td>'
+                education_pattern = r'.*?历：</span>(.*?)</td>'
+                introduction_pattern = r'<div class="introduce">(.*?)</div>'
+                details = []
+                for item in results:
+                    # print(item)
+                    detail = {}
+                    album = re.findall(album_pattern, str(item))
+                    img = re.findall(img_pattern, str(item))
+                    location = re.findall(location_pattern, str(item))
+                    sex = re.findall(sex_pattern, str(item))
+                    marriage = re.findall(marriage_pattern, str(item))
+                    height = re.findall(height_pattern, str(item))
+                    eduction = re.findall(education_pattern, str(item))
+                    introduction = re.findall(introduction_pattern, str(item))
+                    # print("主页: {}".format(album))
+                    # print("照片: {}".format(img))
+                    # print("居住地点: {}".format(location))
+                    # print("性别: {}".format(sex))
+                    # print("婚姻状况: {}".format(marriage))
+                    # print("身高: {}".format(height))
+                    # print("教育背景: {}".format(eduction))
+                    # print("个人介绍: {}".format(introduction))
+                    detail['album'] = None if len(img) == 0 else img[0]
+                    detail['img'] = None if len(img) == 0 else img[0]
+                    detail['location'] = None if len(location) == 0 else location[0]
+                    detail['sex'] = None if len(sex) == 0 else sex[0]
+                    detail['marriage'] = None if len(marriage) == 0 else marriage[0]
+                    detail['height'] = None if len(height) == 0 else height[0]
+                    detail['education'] = None if len(eduction) == 0 else eduction[0]
+                    detail['introduction'] = None if len(introduction) == 0 else introduction[0]
+                    details.append(detail)
+                return details
+            except AttributeError:
+                print("[Error] Fail to parse data.")
+                return None
+        else:
+            print("[Error] Data is None")
+            return None
+
+    def get_all_url(self):
+        base_url = "https://www.zhenai.com/zhenghun"
+        response = requests.get(base_url, headers = self.headers)
+        if response.status_code == 200:
+            data = response.text
+            pattern = '<a data-v-1573aa7c="" href="(.*?)">.*?</a>'
+            html = BeautifulSoup(data, "html.parser")
+            table = html.find("dl", class_ = "city-list clearfix")
+            all_city_url = re.findall(pattern, str(table))
+            # print(all_city_url)
+            self.url_list = all_city_url
+        else:
+            print('[Error] Fail to visit {}'.format(base_url))
+            sys.exit(-1)
+
+    def run(self, filename):
+        super(ZSpider, self).run()
+        self.get_all_url()
+        for url in self.url_list:
+            for page in range(1, 7):
+                data = self.req(url, page)
+                details = self.parse(data)
+                self.persist(filename, details)
+
 
     

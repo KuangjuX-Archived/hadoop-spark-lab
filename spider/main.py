@@ -1,4 +1,5 @@
 from single_spider import JSpider, ZSpider
+import time
 
 def jsingle_main():
     url = 'https://search.jiayuan.com/v2/search_v2.php'
@@ -19,26 +20,10 @@ def jsingle_main():
         spider.run(page, payload)
 
 def zsingle_main():
-    url = "https://www.zhenai.com/api/search/getConditionData.do"
+    url = "http://www.zhenai.com/zhenghun"
     spider = ZSpider(url)
-    for page in range(1, 10):
-        payload = {
-            ('sex', '1'),
-            ('workCity', '-1'),
-            ('ageBegin', '-1'),
-            ('ageEnd', '-1'),
-            ('heightBegin', '-1'),
-            ('heightEnd', '-1'),
-            ('body', '-1'),
-            ('multiEducation', '-1'),
-            ('salaryBegin', '-1'),
-            ('salaryEnd', '-1'),
-            ('page', str(page)),
-            ('pageSize', '20'),
-            ('_', '1641479868103'),
-            ('ua', 'h5/1.0.0/1/0/0/0/901045/0//0/0/97b254c7-1906-4f00-82f0-53adb10d15ba/0/0/83518767')
-        }
-        spider.run(page, payload)
+    spider.run("data/珍爱网.csv")
+        
 
 if __name__ == '__main__':
     zsingle_main()
