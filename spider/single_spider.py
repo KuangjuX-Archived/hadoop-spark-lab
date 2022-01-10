@@ -1,4 +1,6 @@
 import requests
+from requests import cookies
+from requests.cookies import RequestsCookieJar
 import random
 import sys
 import os
@@ -61,7 +63,7 @@ class SingleSpider:
             sys.exit(-1)
 
     def req(self, payload):
-        response = self.session.post(url = self.url, data=payload)
+        response = self.session.post(url = self.url, data=payload, headers = self.headers)
         if response.status_code == 200:
             return response.text
         else:
@@ -84,17 +86,24 @@ class SingleSpider:
 
 # 世纪佳缘爬虫的具体类
 class JSpider(SingleSpider):
-    def __init__(self, url, username, password):
+    # 重载的构造函数，除了调用父类的构造函数外，还需要用户名和密码
+    def __init__(self, url, username, password, cookies):
         super(JSpider, self).__init__(url)
         self.username = username
         self.password = password 
         self.login_url = 'https://passport.jiayuan.com/dologin.php?pre_url=http://www.jiayuan.com/usercp'
+        jar = RequestsCookieJar()
+        for cookie in cookies.split(';'):
+            key, value = cookie.split('=', 1)
+            jar.set(key, value)
+        self.cookies = jar
 
+    # 对个人信息进行更深的提取
     def __deep_search(self, id):
         url = "https://www.jiayuan.com/{}?fxly=search_v2".format(id)
         names = ['education', 'height', 'car', 'income', 'house', 'weight', 'constellation', 'nationality', 'zodiac', 'blood']
         try:
-            response = self.session.get(url)
+            response = self.session.get(url, headers = self.headers, cookies = self.cookies)
             if response.status_code == 200:
                 html = BeautifulSoup(response.text, 'html.parser')
                 try:
@@ -115,20 +124,22 @@ class JSpider(SingleSpider):
                         nationality = re.findall(nationality_pattern, str(item))
                         marriage = re.findall(marriage_pattern, str(item))
                         location = re.findall(location_pattern, str(item))
-                        print("[Debug] 年龄: {}".format(age))
-                        print("[Debug] 身高: {}".format(height))
-                        print("[Debug] 教育背景: {}".format(eduction))
-                        print("[Debug] 民族: {}".format(nationality))
-                        print("[Debug] 婚姻状况: {}".format(marriage))
-                        print("[Debug] 居住地: {}".format(location))
+                        # print("[Debug] 年龄: {}".format(age))
+                        # print("[Debug] 身高: {}".format(height))
+                        # print("[Debug] 教育背景: {}".format(eduction))
+                        # print("[Debug] 民族: {}".format(nationality))
+                        # print("[Debug] 婚姻状况: {}".format(marriage))
+                        # print("[Debug] 居住地: {}".format(location))
 
                     # 获取用户的详细信息
                     user_results = html.find("ul", class_ = "member_info_list fn-clear").find_all('em')
+                    # print("[Debug] user_results: {}".format(user_results))
                     pattern = r"<.*?>(.*?)<.*?>"
                     details = {}
                     for (index, item) in enumerate(user_results):
                         info = re.findall(pattern, str(item)).pop()
                         details[names[index]] = info
+                    print("[Debug] 用户详细个人信息: {}".format(details))
                     return details
                 except AttributeError:
                     print("[Error] 被屏蔽了")
@@ -170,11 +181,14 @@ class JSpider(SingleSpider):
             extract_item = {}
             for k, v in item.items():
                 if k == 'uid' and v == 253091710:
+                    # 这是自己的 UID, 直接跳过
                     break
                 elif k == 'realUid':
                     # 爬取用户更详细的信息
                     details = self.__deep_search(v)
+                    # 对信息进行合并
                     extract_item = dict(extract_item, **details)
+                    print("[Debug] 用户个人信息: {}".format(extract_item))
                 elif k in keys:
                     filter_value = re.compile(r'<[^>]+>', re.S)
                     filter_value = filter_value.sub(' ', str(v))
@@ -197,12 +211,17 @@ class JSpider(SingleSpider):
                 # 构造登录需要的 payload
                 payload['name'] = self.username
                 payload['password'] = self.password
-                print("[Debug] payload: {}".format(payload))
+                # print("[Debug] payload: {}".format(payload))
                 try:
                     # 向登录 URL 发送请求
                     response = self.session.post(self.login_url, data = payload, headers = self.headers)
                     if response.status_code == 200:
-                        print("[Debug] Success to login")
+                        print('[Debug] {}'.format(response.text))
+                        if response.text.count(u'jump'):
+                            print('[Debug] Success to login')
+                        else:
+                            print('[Debug] Fail to login')
+                            sys.exit(-1)
                     else:
                         print("[Error] Fail to login, status code is {}".format(response.status_code))
                         self.login()
@@ -258,6 +277,7 @@ class ZSpider(SingleSpider):
                 for item in results:
                     # print(item)
                     detail = {}
+                    # 获取所有个人信息
                     album = re.findall(album_pattern, str(item))
                     img = re.findall(img_pattern, str(item))
                     location = re.findall(location_pattern, str(item))
@@ -266,15 +286,8 @@ class ZSpider(SingleSpider):
                     height = re.findall(height_pattern, str(item))
                     eduction = re.findall(education_pattern, str(item))
                     introduction = re.findall(introduction_pattern, str(item))
-                    # print("主页: {}".format(album))
-                    # print("照片: {}".format(img))
-                    # print("居住地点: {}".format(location))
-                    # print("性别: {}".format(sex))
-                    # print("婚姻状况: {}".format(marriage))
-                    # print("身高: {}".format(height))
-                    # print("教育背景: {}".format(eduction))
-                    # print("个人介绍: {}".format(introduction))
-                    detail['album'] = None if len(img) == 0 else img[0]
+                    # 将个人信息加入到字典中
+                    detail['album'] = None if len(album) == 0 else img[0]
                     detail['img'] = None if len(img) == 0 else img[0]
                     detail['location'] = None if len(location) == 0 else location[0]
                     detail['sex'] = None if len(sex) == 0 else sex[0]

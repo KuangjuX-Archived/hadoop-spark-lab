@@ -18,12 +18,24 @@ def get_account():
     print("您的密码为: {}".format(password))
     return (username, password)
 
+def get_cookie():
+    if not os.path.exists("cookie.txt"):
+        cookie = input("请输入 Cookie: ")
+        with open("cookie.txt", "w+") as cookie_txt:
+            cookie_txt.write(cookie)
+    else:
+        cookie_txt = open('cookie.txt', 'r+')
+        cookie = cookie_txt.readline()
+        cookie_txt.close()
+    print("Cookie 为 {}".format(cookie))
+    return cookie
 
 def jsingle_main():
     (username, password) = get_account()
+    cookie = get_cookie()
     url = 'https://search.jiayuan.com/v2/search_v2.php'
-    spider = JSpider(url, username, password)
-    spider.login()
+    spider = JSpider(url, username, password, cookie)
+    # spider.login()
     for page in range(1, 2):
         payload = [
             ('sex', 'f'),

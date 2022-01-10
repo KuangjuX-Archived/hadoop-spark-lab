@@ -34,12 +34,4 @@ def get_tracks(distance, seconds, ease_func):
         offsets.append(offset)
     return offsets, tracks
 
-# def drag_and_drop(browser, offset):
-#     knob = browser.find_element_by_class_name("gt_slider_knob")
-#     offsets, tracks = easing.get_tracks(offset, 12, 'ease_out_expo')
-#     ActionChains(browser).click_and_hold(knob).perform()
-#     for x in tracks:
-#         ActionChains(browser).move_by_offset(x, 0).perform()
-#         ActionChains(browser).pause(0.5).release().perform()
-
 
