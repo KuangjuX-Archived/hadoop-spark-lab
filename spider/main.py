@@ -4,7 +4,7 @@ import time
 def jsingle_main():
     url = 'https://search.jiayuan.com/v2/search_v2.php'
     spider = JSpider(url)
-    for page in range(91, 200):
+    for page in range(291, 500):
         payload = [
             ('sex', 'f'),
             ('key', ''), 

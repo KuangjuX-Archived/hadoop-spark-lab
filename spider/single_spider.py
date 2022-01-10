@@ -6,8 +6,6 @@ import csv
 import re
 from bs4 import BeautifulSoup
 from json.decoder import JSONDecodeError
-from threading import Lock
-
 from requests.models import ChunkedEncodingError
 from slider_crack import SliderCracker
 
@@ -111,6 +109,9 @@ class JSpider(SingleSpider):
             return self.__deep_search(id)
         except requests.exceptions.SSLError as ssl_error:
             print("[Error] {}".format(ssl_error))
+            return self.__deep_search(id)
+        except Exception as err:
+            print("[Error] {}".format(err))
             return self.__deep_search(id)
 
     def req(self, page: int, payload):
