@@ -1,6 +1,7 @@
 import requests
 import random
 import sys
+import os
 import json
 import csv
 import re
@@ -83,6 +84,12 @@ class SingleSpider:
 
 # 世纪佳缘爬虫的具体类
 class JSpider(SingleSpider):
+    def __init__(self, url, username, password):
+        super(JSpider, self).__init__(url)
+        self.username = username
+        self.password = password 
+        self.login_url = 'https://passport.jiayuan.com/dologin.php?pre_url=http://www.jiayuan.com/usercp'
+
     def __deep_search(self, id):
         url = "https://www.jiayuan.com/{}?fxly=search_v2".format(id)
         names = ['education', 'height', 'car', 'income', 'house', 'weight', 'constellation', 'nationality', 'zodiac', 'blood']
@@ -91,13 +98,37 @@ class JSpider(SingleSpider):
             if response.status_code == 200:
                 html = BeautifulSoup(response.text, 'html.parser')
                 try:
-                    results = html.find("ul", class_ = "member_info_list fn-clear").find_all('em')
+                    # 获取择偶标准
+                    criteria_results = html.find("ul", class_ = "js_list fn-clear").find_all('li')
+                    # print(criteria_results)
+                    age_pattern = '.*?龄：</span><div class="ifno_r_con">(.*?)<font.*?>'
+                    height_pattern = '.*?高：</span><div class="ifno_r_con">(.*?)<font.*?>'
+                    eduction_pattern = '.*?历：</span><div class="ifno_r_con">(.*?)<font.*?>'
+                    nationality_pattern = '.*?族：</span><div class="ifno_r_con">(.*?)</div></li>'
+                    marriage_pattern = '婚姻状况：</span><div class="ifno_r_con">(.*?)<font.*?>'
+                    location_pattern = '.*?地：</span> \
+<div class="ifno_r_con_1">(.*?)<font.*?>'
+                    for(index, item) in enumerate(criteria_results):
+                        age = re.findall(age_pattern, str(item))
+                        height = re.findall(height_pattern, str(item))
+                        eduction = re.findall(eduction_pattern, str(item))
+                        nationality = re.findall(nationality_pattern, str(item))
+                        marriage = re.findall(marriage_pattern, str(item))
+                        location = re.findall(location_pattern, str(item))
+                        print("[Debug] 年龄: {}".format(age))
+                        print("[Debug] 身高: {}".format(height))
+                        print("[Debug] 教育背景: {}".format(eduction))
+                        print("[Debug] 民族: {}".format(nationality))
+                        print("[Debug] 婚姻状况: {}".format(marriage))
+                        print("[Debug] 居住地: {}".format(location))
+
+                    # 获取用户的详细信息
+                    user_results = html.find("ul", class_ = "member_info_list fn-clear").find_all('em')
                     pattern = r"<.*?>(.*?)<.*?>"
                     details = {}
-                    for (index, item) in enumerate(results):
+                    for (index, item) in enumerate(user_results):
                         info = re.findall(pattern, str(item)).pop()
                         details[names[index]] = info
-                    # print(details)
                     return details
                 except AttributeError:
                     print("[Error] 被屏蔽了")
@@ -150,13 +181,50 @@ class JSpider(SingleSpider):
                     extract_item[k] = filter_value
             extract_data.append(extract_item)
         return extract_data
+    
+    # 模拟登陆并获取对应的 cookie 以拿到更详细的信息
+    def login(self):
+        try:
+            # 首先访问登录页，拿到所有有关登陆的信息
+            response = self.session.get('http://login.jiayuan.com', headers = self.headers)
+            if response.status_code == 200:
+                html = BeautifulSoup(response.text, 'html.parser')
+                # 获取所有 input 信息
+                payload = {}
+                for item in html.find_all('input'):
+                    if item.get('name') != None:
+                        payload[item.get('name')] = item.get('value')
+                # 构造登录需要的 payload
+                payload['name'] = self.username
+                payload['password'] = self.password
+                print("[Debug] payload: {}".format(payload))
+                try:
+                    # 向登录 URL 发送请求
+                    response = self.session.post(self.login_url, data = payload, headers = self.headers)
+                    if response.status_code == 200:
+                        print("[Debug] Success to login")
+                    else:
+                        print("[Error] Fail to login, status code is {}".format(response.status_code))
+                        self.login()
+                except Exception as error:
+                    print("[Error] Fali to login, error is {}".format(error))
+                    # self.login()
+                    sys.exit(-1)
+            else:
+                print("[Error] Fail to visit login page, status code is {}".format(response.status_code))
+        except Exception as error:
+            print("[Error] Fail to visit login page, error is {}".format(error))
+            # self.login()
+            sys.exit(-1)
+
+        
 
 
     def run(self, page: int, payload: dict):
         print("[Debug] Spider is running in page {}".format(page))
         data = self.req(page, payload)
         flush_data = self.extarct(data)
-        self.persist("data/世纪佳缘.csv", flush_data)
+        # self.persist("data/世纪佳缘.csv", flush_data)
             
 
 
@@ -232,7 +300,6 @@ class ZSpider(SingleSpider):
             html = BeautifulSoup(data, "html.parser")
             table = html.find("dl", class_ = "city-list clearfix")
             all_city_url = re.findall(pattern, str(table))
-            # print(all_city_url)
             self.url_list = all_city_url
         else:
             print('[Error] Fail to visit {}'.format(base_url))
@@ -246,6 +313,8 @@ class ZSpider(SingleSpider):
                 data = self.req(url, page)
                 details = self.parse(data)
                 self.persist(filename, details)
+
+
 
 
     

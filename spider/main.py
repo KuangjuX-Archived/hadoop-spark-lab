@@ -1,10 +1,30 @@
 from single_spider import JSpider, ZSpider
-import time
+import os
+
+# 获取账户信息
+def get_account():
+    if not os.path.exists("account.txt"):
+        username = input("请输入用户名: ")
+        password = input("请输入密码: ")
+        with open("account.txt", "w+") as account:
+            account.write(username)
+            account.write("\n")
+            account.write(password)
+    else:
+        with open("account.txt", "r+") as account:
+            username = account.readline()
+            password = account.readline()
+    print("您的用户名为: {}".format(username))
+    print("您的密码为: {}".format(password))
+    return (username, password)
+
 
 def jsingle_main():
+    (username, password) = get_account()
     url = 'https://search.jiayuan.com/v2/search_v2.php'
-    spider = JSpider(url)
-    for page in range(291, 500):
+    spider = JSpider(url, username, password)
+    spider.login()
+    for page in range(1, 2):
         payload = [
             ('sex', 'f'),
             ('key', ''), 

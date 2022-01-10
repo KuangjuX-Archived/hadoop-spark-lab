@@ -47,11 +47,6 @@ class SliderCracker():
         :return: None
         """
         self.browser.get(self.url)
-        # self.browser.delete_all_cookies()
-
-        # for cookie in self.cookies:
-        #     if cookie['domain'] == '.jiayuan.com':
-        #         self.browser.add_cookie(cookie)
     
     def get_gap(self, image1, image2):
         """
