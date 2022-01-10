@@ -7,6 +7,8 @@ import re
 from bs4 import BeautifulSoup
 from json.decoder import JSONDecodeError
 from threading import Lock
+
+from requests.models import ChunkedEncodingError
 from slider_crack import SliderCracker
 
 # 单线程爬虫抽象类
@@ -67,6 +69,7 @@ class SingleSpider:
             print('[Error] Fail to request url')
             return None
 
+    # 持久化，写入到 csv 文件中
     def persist(self, filename, data):
         with open(filename, 'a+', encoding='utf-8') as f:
             csv_writer = csv.writer(f)
@@ -85,23 +88,30 @@ class JSpider(SingleSpider):
     def __deep_search(self, id):
         url = "https://www.jiayuan.com/{}?fxly=search_v2".format(id)
         names = ['education', 'height', 'car', 'income', 'house', 'weight', 'constellation', 'nationality', 'zodiac', 'blood']
-        response = self.session.get(url)
-        if response.status_code == 200:
-            html = BeautifulSoup(response.text, 'html.parser')
-            try:
-                results = html.find("ul", class_ = "member_info_list fn-clear").find_all('em')
-                pattern = r"<.*?>(.*?)<.*?>"
-                details = {}
-                for (index, item) in enumerate(results):
-                    info = re.findall(pattern, str(item)).pop()
-                    details[names[index]] = info
-                print(details)
-                return details
-            except AttributeError:
-                print("[Error] 被屏蔽了")
-                slider_cracker = SliderCracker(url)
-                slider_cracker.crack()     
-                return self.__deep_search(id)     
+        try:
+            response = self.session.get(url)
+            if response.status_code == 200:
+                html = BeautifulSoup(response.text, 'html.parser')
+                try:
+                    results = html.find("ul", class_ = "member_info_list fn-clear").find_all('em')
+                    pattern = r"<.*?>(.*?)<.*?>"
+                    details = {}
+                    for (index, item) in enumerate(results):
+                        info = re.findall(pattern, str(item)).pop()
+                        details[names[index]] = info
+                    # print(details)
+                    return details
+                except AttributeError:
+                    print("[Error] 被屏蔽了")
+                    slider_cracker = SliderCracker(url)
+                    slider_cracker.crack()     
+                    return self.__deep_search(id)   
+        except ChunkedEncodingError as error:
+            print("[Error] {}".format(error))
+            return self.__deep_search(id)
+        except requests.exceptions.SSLError as ssl_error:
+            print("[Error] {}".format(ssl_error))
+            return self.__deep_search(id)
 
     def req(self, page: int, payload):
         data = super(JSpider, self).req(payload)
@@ -119,6 +129,8 @@ class JSpider(SingleSpider):
     
     # 提取用户信息并从个人主页中拿到更加详细的个人信息
     def extarct(self, data):
+        if data == None:
+            return None
         extract_data = []
         keys = ['uid', 'nickname', 'sex', 'marriage', 'height', 'education', 'income', 'work_location', 'image', "randListTag", "randTag", "shortnote"]
         user_info = data['userInfo']
@@ -126,7 +138,7 @@ class JSpider(SingleSpider):
             extract_item = {}
             for k, v in item.items():
                 if k == 'uid' and v == 253091710:
-                    continue
+                    break
                 elif k == 'realUid':
                     # 爬取用户更详细的信息
                     details = self.__deep_search(v)
@@ -138,22 +150,13 @@ class JSpider(SingleSpider):
             extract_data.append(extract_item)
         return extract_data
 
-    
-    def store_csv(self, filename, data):
-        with open(filename, 'a+', encoding='utf-8') as f:
-            csv_writer = csv.writer(f)
-            for item in data:
-                info = [str(v) for v in item.values()]
-                csv_writer.writerow(info)
 
     def run(self, page: int, payload: dict):
+        print("[Debug] Spider is running in page {}".format(page))
         data = self.req(page, payload)
-        if data == None:
-            return 
-        else:
-            flush_data = self.extarct(data)
-            print(flush_data)
-            self.store_csv("new_data.csv", flush_data)
+        flush_data = self.extarct(data)
+        self.persist("data/世纪佳缘.csv", flush_data)
+            
 
 
 class ZSpider(SingleSpider):

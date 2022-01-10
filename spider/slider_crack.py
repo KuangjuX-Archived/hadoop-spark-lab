@@ -22,6 +22,7 @@ class SliderCracker():
     def __init__(self, url):
         options = webdriver.ChromeOptions()
         options.add_experimental_option('excludeSwitches', ['enable-logging'])
+        options.add_argument('headless')
         self.url = url
         self.browser = webdriver.Chrome(options = options)
         self.wait = WebDriverWait(self.browser, 3)
