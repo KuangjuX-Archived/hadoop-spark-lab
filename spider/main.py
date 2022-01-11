@@ -35,11 +35,10 @@ def get_cookies():
     print("Cookie 为 {}".format(cookie))
     return cookie
 
-def jsingle_main():
+def single_jiayuan_main():
     cookie = get_cookies()
     url = 'https://search.jiayuan.com/v2/search_v2.php'
-    spider = JiaYuanSpider(url, cookie)
-    # spider.login()
+    spider = JiaYuanSpider(url, cookie, "data/世纪佳缘-测试.csv")
     for page in range(1, 2):
         payload = [
             ('sex', 'f'),
@@ -55,10 +54,10 @@ def jsingle_main():
         ]
         spider.run(page, payload)
 
-def zsingle_main():
+def single_zhenai_main():
     url = "http://www.zhenai.com/zhenghun"
-    spider = ZhenAiSpider(url)
-    spider.run("data/珍爱网.csv")
+    spider = ZhenAiSpider(url, "data/珍爱.csv")
+    spider.run()
 
 async def async_jiayuan_main():
     if(len(sys.argv) < 4):
@@ -90,4 +89,6 @@ async def async_jiayuan_main():
         
 
 if __name__ == '__main__':
+    # asyncio.run(async_jiayuan_main())
+    # single_jiayuan_main()
     asyncio.run(async_jiayuan_main())

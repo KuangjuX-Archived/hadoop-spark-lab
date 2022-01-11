@@ -12,8 +12,9 @@ from slider_crack import SliderCracker
 
 # 单线程爬虫抽象类
 class SingleSpider:
-    def __init__(self, url):
+    def __init__(self, url, filename):
         self.url = url
+        self.filename = filename
         self.session = requests.Session()
         self.headers = self.__get_user_agent()
 
@@ -69,14 +70,14 @@ class SingleSpider:
             return None
 
     # 持久化，写入到 csv 文件中
-    def persist(self, filename, data):
-        with open(filename, 'a+', encoding='utf-8') as f:
+    def persist(self, data):
+        with open(self.filename, 'a+', encoding='utf-8') as f:
             csv_writer = csv.writer(f)
             if data == None:
                 return 
             else:
                 for item in data:
-                    info = [str(v) for v in item.values()]
+                    info = ["key: {}, v: {}".format(k, v) for k, v in item.items()]
                     csv_writer.writerow(info)
 
     def run(self):
@@ -85,8 +86,8 @@ class SingleSpider:
 # 世纪佳缘爬虫的具体类
 class JiaYuanSpider(SingleSpider):
     # 重载的构造函数，除了调用父类的构造函数外，还需要用户名和密码
-    def __init__(self, url, cookies):
-        super(JiaYuanSpider, self).__init__(url)
+    def __init__(self, url, cookies, filename):
+        super(JiaYuanSpider, self).__init__(url, filename)
         self.login_url = 'https://passport.jiayuan.com/dologin.php?pre_url=http://www.jiayuan.com/usercp'
         jar = RequestsCookieJar()
         for cookie in cookies.split(';'):
@@ -121,12 +122,12 @@ class JiaYuanSpider(SingleSpider):
                         nationality = re.findall(nationality_pattern, str(item))
                         marriage = re.findall(marriage_pattern, str(item))
                         location = re.findall(location_pattern, str(item))
-                        criterias['age'] = None if len(age) == 0 else age[0]
-                        criterias['height'] = None if len(height) == 0 else height[0]
-                        criterias['education'] = None if len(education) == 0 else education[0]
-                        criterias['nationality'] = None if len(nationality) == 0 else nationality[0]
-                        criterias['marriage'] = None if len(marriage) == 0 else marriage[0]
-                        criterias['location'] = None if len(location) == 0 else location[0]
+                        criterias['criterias_age'] = None if len(age) == 0 else age[0]
+                        criterias['criterias_height'] = None if len(height) == 0 else height[0]
+                        criterias['criterias_education'] = None if len(education) == 0 else education[0]
+                        criterias['criterias_nationality'] = None if len(nationality) == 0 else nationality[0]
+                        criterias['criterias_marriage'] = None if len(marriage) == 0 else marriage[0]
+                        criterias['criterias_location'] = None if len(location) == 0 else location[0]
                     print("[Debug] 择偶标准: {}".format(criterias))
 
                     # 获取用户的详细信息
@@ -137,7 +138,7 @@ class JiaYuanSpider(SingleSpider):
                         info = re.findall(pattern, str(item)).pop()
                         details[names[index]] = info
                     print("[Debug] 用户详细个人信息: {}".format(details))
-                    return details
+                    return (details, criterias)
                 except AttributeError:
                     print("[Error] 被屏蔽了")
                     slider_cracker = SliderCracker(url)
@@ -182,9 +183,10 @@ class JiaYuanSpider(SingleSpider):
                     break
                 elif k == 'realUid':
                     # 爬取用户更详细的信息
-                    details = self.__deep_search(v)
+                    (details, criterias) = self.__deep_search(v)
                     # 对信息进行合并
                     extract_item = dict(extract_item, **details)
+                    extract_item = dict(extract_item, **criterias)
                     print("[Debug] 用户个人信息: {}".format(extract_item))
                 elif k in keys:
                     filter_value = re.compile(r'<[^>]+>', re.S)
@@ -208,7 +210,6 @@ class JiaYuanSpider(SingleSpider):
                 # 构造登录需要的 payload
                 payload['name'] = username
                 payload['password'] = password
-                # print("[Debug] payload: {}".format(payload))
                 try:
                     # 向登录 URL 发送请求
                     response = self.session.post(self.login_url, data = payload, headers = self.headers)
@@ -240,7 +241,7 @@ class JiaYuanSpider(SingleSpider):
         print("[Debug] Spider is running in page {}".format(page))
         data = self.req(page, payload)
         flush_data = self.extarct(data)
-        # self.persist("data/世纪佳缘.csv", flush_data)
+        self.persist(flush_data)
             
 
 
@@ -315,14 +316,14 @@ class ZhenAiSpider(SingleSpider):
             print('[Error] Fail to visit {}'.format(base_url))
             sys.exit(-1)
 
-    def run(self, filename):
+    def run(self):
         super(ZhenAiSpider, self).run()
         self.get_all_url()
         for url in self.url_list:
             for page in range(1, 7):
                 data = self.req(url, page)
                 details = self.parse(data)
-                self.persist(filename, details)
+                self.persist(details)
 
 
 

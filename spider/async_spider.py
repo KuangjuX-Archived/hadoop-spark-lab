@@ -81,7 +81,7 @@ class AsyncSpider:
             else:
                 self.write_lock.acquire()
                 for item in data:
-                    info = [str(v) for v in item.values()]
+                    info = ["key: {}, value: {}".format(k, v) for k, v in item.items()]
                     csv_writer.writerow(info)
                 self.write_lock.release()
 
@@ -125,12 +125,12 @@ class AsyncJiaYuanSpider(AsyncSpider):
                         nationality = re.findall(nationality_pattern, str(item))
                         marriage = re.findall(marriage_pattern, str(item))
                         location = re.findall(location_pattern, str(item))
-                        criterias['age'] = None if len(age) == 0 else age[0]
-                        criterias['height'] = None if len(height) == 0 else height[0]
-                        criterias['education'] = None if len(education) == 0 else education[0]
-                        criterias['nationality'] = None if len(nationality) == 0 else nationality[0]
-                        criterias['marriage'] = None if len(marriage) == 0 else marriage[0]
-                        criterias['location'] = None if len(location) == 0 else location[0]
+                        criterias['criterias_age'] = None if len(age) == 0 else age[0]
+                        criterias['criterias_height'] = None if len(height) == 0 else height[0]
+                        criterias['criterias_education'] = None if len(education) == 0 else education[0]
+                        criterias['criterias_nationality'] = None if len(nationality) == 0 else nationality[0]
+                        criterias['criterias_marriage'] = None if len(marriage) == 0 else marriage[0]
+                        criterias['criterias_location'] = None if len(location) == 0 else location[0]
                     # print("[Debug] 择偶标准: {}".format(criterias))
 
                     # 获取用户的详细信息
@@ -141,7 +141,7 @@ class AsyncJiaYuanSpider(AsyncSpider):
                         info = re.findall(pattern, str(item)).pop()
                         details[names[index]] = info
                     # print("[Debug] 用户详细个人信息: {}".format(details))
-                    return details
+                    return (details, criterias)
                 except AttributeError:
                     print("[Error] 被屏蔽了")
                     slider_cracker = SliderCracker(url)
@@ -192,9 +192,10 @@ class AsyncJiaYuanSpider(AsyncSpider):
                 elif k == 'realUid':
                     # 爬取用户更详细的信息
                     task = asyncio.create_task(self.__deep_search(v))
-                    details = await task
+                    (details, criterias) = await task
                     # 对信息进行合并
                     extract_item = dict(extract_item, **details)
+                    extract_item = dict(extract_item, **criterias)
                     # print("[Debug] 用户个人信息: {}".format(extract_item))
                 elif k in keys:
                     filter_value = re.compile(r'<[^>]+>', re.S)
