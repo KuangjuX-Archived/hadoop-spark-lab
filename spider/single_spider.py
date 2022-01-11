@@ -1,9 +1,7 @@
 import requests
-from requests import cookies
 from requests.cookies import RequestsCookieJar
 import random
 import sys
-import os
 import json
 import csv
 import re
@@ -85,12 +83,10 @@ class SingleSpider:
         pass
 
 # 世纪佳缘爬虫的具体类
-class JSpider(SingleSpider):
+class JiaYuanSpider(SingleSpider):
     # 重载的构造函数，除了调用父类的构造函数外，还需要用户名和密码
-    def __init__(self, url, username, password, cookies):
-        super(JSpider, self).__init__(url)
-        self.username = username
-        self.password = password 
+    def __init__(self, url, cookies):
+        super(JiaYuanSpider, self).__init__(url)
         self.login_url = 'https://passport.jiayuan.com/dologin.php?pre_url=http://www.jiayuan.com/usercp'
         jar = RequestsCookieJar()
         for cookie in cookies.split(';'):
@@ -109,10 +105,11 @@ class JSpider(SingleSpider):
                 try:
                     # 获取择偶标准
                     criteria_results = html.find("ul", class_ = "js_list fn-clear").find_all('li')
+                    criterias = {}
                     # print(criteria_results)
                     age_pattern = '.*?龄：</span><div class="ifno_r_con">(.*?)<font.*?>'
                     height_pattern = '.*?高：</span><div class="ifno_r_con">(.*?)<font.*?>'
-                    eduction_pattern = '.*?历：</span><div class="ifno_r_con">(.*?)<font.*?>'
+                    education_pattern = '.*?历：</span><div class="ifno_r_con">(.*?)<font.*?>'
                     nationality_pattern = '.*?族：</span><div class="ifno_r_con">(.*?)</div></li>'
                     marriage_pattern = '婚姻状况：</span><div class="ifno_r_con">(.*?)<font.*?>'
                     location_pattern = '.*?地：</span> \
@@ -120,20 +117,20 @@ class JSpider(SingleSpider):
                     for(index, item) in enumerate(criteria_results):
                         age = re.findall(age_pattern, str(item))
                         height = re.findall(height_pattern, str(item))
-                        eduction = re.findall(eduction_pattern, str(item))
+                        education = re.findall(education_pattern, str(item))
                         nationality = re.findall(nationality_pattern, str(item))
                         marriage = re.findall(marriage_pattern, str(item))
                         location = re.findall(location_pattern, str(item))
-                        # print("[Debug] 年龄: {}".format(age))
-                        # print("[Debug] 身高: {}".format(height))
-                        # print("[Debug] 教育背景: {}".format(eduction))
-                        # print("[Debug] 民族: {}".format(nationality))
-                        # print("[Debug] 婚姻状况: {}".format(marriage))
-                        # print("[Debug] 居住地: {}".format(location))
+                        criterias['age'] = None if len(age) == 0 else age[0]
+                        criterias['height'] = None if len(height) == 0 else height[0]
+                        criterias['education'] = None if len(education) == 0 else education[0]
+                        criterias['nationality'] = None if len(nationality) == 0 else nationality[0]
+                        criterias['marriage'] = None if len(marriage) == 0 else marriage[0]
+                        criterias['location'] = None if len(location) == 0 else location[0]
+                    print("[Debug] 择偶标准: {}".format(criterias))
 
                     # 获取用户的详细信息
                     user_results = html.find("ul", class_ = "member_info_list fn-clear").find_all('em')
-                    # print("[Debug] user_results: {}".format(user_results))
                     pattern = r"<.*?>(.*?)<.*?>"
                     details = {}
                     for (index, item) in enumerate(user_results):
@@ -157,7 +154,7 @@ class JSpider(SingleSpider):
             return self.__deep_search(id)
 
     def req(self, page: int, payload):
-        data = super(JSpider, self).req(payload)
+        data = super(JiaYuanSpider, self).req(payload)
         if data == None:
             return None 
         else:
@@ -197,7 +194,7 @@ class JSpider(SingleSpider):
         return extract_data
     
     # 模拟登陆并获取对应的 cookie 以拿到更详细的信息
-    def login(self):
+    def login(self, username, password):
         try:
             # 首先访问登录页，拿到所有有关登陆的信息
             response = self.session.get('http://login.jiayuan.com', headers = self.headers)
@@ -209,8 +206,8 @@ class JSpider(SingleSpider):
                     if item.get('name') != None:
                         payload[item.get('name')] = item.get('value')
                 # 构造登录需要的 payload
-                payload['name'] = self.username
-                payload['password'] = self.password
+                payload['name'] = username
+                payload['password'] = password
                 # print("[Debug] payload: {}".format(payload))
                 try:
                     # 向登录 URL 发送请求
@@ -247,7 +244,7 @@ class JSpider(SingleSpider):
             
 
 
-class ZSpider(SingleSpider):
+class ZhenAiSpider(SingleSpider):
     def req(self, url, page):
         url += "/"
         url += str(page)
@@ -319,7 +316,7 @@ class ZSpider(SingleSpider):
             sys.exit(-1)
 
     def run(self, filename):
-        super(ZSpider, self).run()
+        super(ZhenAiSpider, self).run()
         self.get_all_url()
         for url in self.url_list:
             for page in range(1, 7):

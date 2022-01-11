@@ -1,5 +1,10 @@
-from single_spider import JSpider, ZSpider
+import asyncio
+from single_spider import JiaYuanSpider, ZhenAiSpider
 import os
+import sys
+from threading import Lock
+
+from async_spider import AsyncJiaYuanSpider
 
 # 获取账户信息
 def get_account():
@@ -18,7 +23,7 @@ def get_account():
     print("您的密码为: {}".format(password))
     return (username, password)
 
-def get_cookie():
+def get_cookies():
     if not os.path.exists("cookie.txt"):
         cookie = input("请输入 Cookie: ")
         with open("cookie.txt", "w+") as cookie_txt:
@@ -31,10 +36,9 @@ def get_cookie():
     return cookie
 
 def jsingle_main():
-    (username, password) = get_account()
-    cookie = get_cookie()
+    cookie = get_cookies()
     url = 'https://search.jiayuan.com/v2/search_v2.php'
-    spider = JSpider(url, username, password, cookie)
+    spider = JiaYuanSpider(url, cookie)
     # spider.login()
     for page in range(1, 2):
         payload = [
@@ -53,10 +57,37 @@ def jsingle_main():
 
 def zsingle_main():
     url = "http://www.zhenai.com/zhenghun"
-    spider = ZSpider(url)
+    spider = ZhenAiSpider(url)
     spider.run("data/珍爱网.csv")
+
+async def async_jiayuan_main():
+    if(len(sys.argv) < 4):
+        print("[Error] 至少需要四个参数")
+        sys.exit(-1)
+    start_page = sys.argv[1]
+    end_page = sys.argv[2]
+    filename = sys.argv[3]
+    cookies = get_cookies()
+    write_lock = Lock()
+    url = "https://search.jiayuan.com/v2/search_v2.php"
+    spider = AsyncJiaYuanSpider(url, cookies, filename, write_lock)
+    for page in range(int(start_page), int(end_page)):
+        payload = [
+            ('sex', 'f'),
+            ('key', ''), 
+            ('stc', '23:1'),
+            ('sn', 'default'),
+            ('sv', '1'),
+            ('p', str(page)),
+            ('f', ''), 
+            ('listStyle', 'bigPhoto'),
+            ('pri_uid', '254091710'),
+            ('jsversion', 'v5')
+        ]
+        run_task = asyncio.create_task(spider.run(page, payload))
+        await run_task
+    
         
 
 if __name__ == '__main__':
-    # zsingle_main()
-    jsingle_main()
+    asyncio.run(async_jiayuan_main())

@@ -1,27 +1,31 @@
-import time
 import requests
+from requests.cookies import RequestsCookieJar
 import random
 import sys
 import json
 import csv
 import re
-from bs4 import BeautifulSoup
-import asyncio
-import threading
-from json.decoder import JSONDecodeError
 from threading import Lock
+import asyncio
+from bs4 import BeautifulSoup
+from json.decoder import JSONDecodeError
+from requests.models import ChunkedEncodingError
+from slider_crack import SliderCracker
 
-
-
+# 异步爬虫抽象类
 class AsyncSpider:
-    def __init__(self, url, cookie, mutex):
+    def __init__(self, url, filename, write_lock: Lock):
         self.url = url
-        self.cookie = cookie.encode('utf-8').decode('latin1')
-        self.mutex = mutex
-        self.session = requests.session()
-        self.session.cookies.set_cookie(cookie)
-    
-    def _GetUserAgent(self):
+        self.write_lock = write_lock
+        self.filename = filename
+        self.session = requests.Session()
+        self.headers = self.__get_user_agent()
+
+    def __del__(self):
+        print('[Debug] Spider finish and destory')
+
+    # 获取随机 User-Agent 头，防止被识别为爬虫
+    def __get_user_agent(self):
         user_agent_list = [
             'Mozilla/5.0 (X11; U; Linux i686; en-US; rv:1.9.0.8) Gecko Fedora/1.9.0.8-1.fc10 Kazehakase/0.5.6',
             'Mozilla/5.0 (X11; Linux i686; U;) Gecko/20070322 Kazehakase/0.4.5',
@@ -45,12 +49,14 @@ class AsyncSpider:
             'Mozilla/5.0 (iPhone; CPU iPhone OS 10_3 like Mac OS X) AppleWebKit/603.1.30 (KHTML, like Gecko) Version/10.3 Mobile/14E277 Safari/603.1.30',
             'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/61.0.3163.100 Safari/537.36'
         ]
+
         headers = {
             "User-Agent" : random.choice(user_agent_list),\
         }
         return headers
 
-    def _GetProxy(self):
+    # 获取代理 ip 地址
+    def __get_proxy(self):
         try:
             proxy = requests.get("http://127.0.0.1:5555/random").text.strip()
             return proxy
@@ -58,122 +64,191 @@ class AsyncSpider:
             print("[Exception]")
             sys.exit(-1)
 
-
-    async def Deep_Search(self, id):
-        url = "https://www.jiayuan.com/{}?fxly=search_v2".format(id)
-        headers = self._GetUserAgent()
-        headers['cookie'] = self.cookie
-        headers['referer'] = url
-        retry_count = 5
-        names = ['education', 'height', 'car', 'income', 'house', 'weight', 'constellation', 'nationality', 'zodiac', 'blood']
-        while retry_count > 0:
-            try:
-                # proxy = self._GetProxy()
-                # proxies = {'http': 'http://' + proxy}
-                response = requests.get(url, headers=headers)
-                if response.status_code == 200:
-                    html = BeautifulSoup(response.text, 'html.parser')
-                    try:
-                        results = html.find("ul", class_ = "member_info_list fn-clear").find_all('em')
-                        pattern = r"<.*?>(.*?)<.*?>"
-                        details = {}
-                        for (index, item) in enumerate(results):
-                            info = re.findall(pattern, str(item)).pop()
-                            details[names[index]] = info
-                        return details
-                    except AttributeError:
-                        sys.exit(-1)
-                        # return {k: '--' for k in names}
-                else:
-                    sys.exit(-1)
-            except Exception:
-                retry_count -= 1
-        return {k: '--' for k in names}
-
-    async def Req(self, page: int):
-        payload = [
-            ('sex', 'f'),
-            ('key', ''), 
-            ('stc', '23:1'),
-            ('sn', 'default'),
-            ('sv', '1'),
-            ('p', str(page)),
-            ('f', ''), 
-            ('listStyle', 'bigPhoto'),
-            ('pri_uid', '254091710'),
-            ('jsversion', 'v5')
-        ]
-        headers = self._GetUserAgent()
-        headers['cookie'] = self.cookie
-        response = self.session.post(url = self.url, headers=headers, data=payload)
+    async def req(self, payload):
+        response = self.session.post(url = self.url, data=payload, headers = self.headers)
         if response.status_code == 200:
-            print('成功获取数据')
-            data = response.text[11:]
+            return response.text
+        else:
+            print('[Error] Fail to request url')
+            return None
+
+    # 持久化，写入到 csv 文件中
+    async def persist(self, data):
+        with open(self.filename, 'a+', encoding='utf-8') as f:
+            csv_writer = csv.writer(f)
+            if data == None:
+                return 
+            else:
+                self.write_lock.acquire()
+                for item in data:
+                    info = [str(v) for v in item.values()]
+                    csv_writer.writerow(info)
+                self.write_lock.release()
+
+
+# 世纪佳缘爬虫的具体类
+class AsyncJiaYuanSpider(AsyncSpider):
+    # 重载的构造函数，除了调用父类的构造函数外，还需要用户名和密码
+    def __init__(self, url, cookies, filename, write_lock: Lock):
+        super(AsyncJiaYuanSpider, self).__init__(url, filename, write_lock)
+        self.login_url = 'https://passport.jiayuan.com/dologin.php?pre_url=http://www.jiayuan.com/usercp'
+        jar = RequestsCookieJar()
+        for cookie in cookies.split(';'):
+            key, value = cookie.split('=', 1)
+            jar.set(key, value)
+        self.cookies = jar
+
+    # 对个人信息进行更深的提取
+    async def __deep_search(self, id):
+        url = "https://www.jiayuan.com/{}?fxly=search_v2".format(id)
+        names = ['education', 'height', 'car', 'income', 'house', 'weight', 'constellation', 'nationality', 'zodiac', 'blood']
+        try:
+            response = self.session.get(url, headers = self.headers, cookies = self.cookies)
+            if response.status_code == 200:
+                html = BeautifulSoup(response.text, 'html.parser')
+                try:
+                    # 获取择偶标准
+                    criteria_results = html.find("ul", class_ = "js_list fn-clear").find_all('li')
+                    criterias = {}
+                    # print(criteria_results)
+                    age_pattern = '.*?龄：</span><div class="ifno_r_con">(.*?)<font.*?>'
+                    height_pattern = '.*?高：</span><div class="ifno_r_con">(.*?)<font.*?>'
+                    education_pattern = '.*?历：</span><div class="ifno_r_con">(.*?)<font.*?>'
+                    nationality_pattern = '.*?族：</span><div class="ifno_r_con">(.*?)</div></li>'
+                    marriage_pattern = '婚姻状况：</span><div class="ifno_r_con">(.*?)<font.*?>'
+                    location_pattern = '.*?地：</span> \
+<div class="ifno_r_con_1">(.*?)<font.*?>'
+                    for(index, item) in enumerate(criteria_results):
+                        age = re.findall(age_pattern, str(item))
+                        height = re.findall(height_pattern, str(item))
+                        education = re.findall(education_pattern, str(item))
+                        nationality = re.findall(nationality_pattern, str(item))
+                        marriage = re.findall(marriage_pattern, str(item))
+                        location = re.findall(location_pattern, str(item))
+                        criterias['age'] = None if len(age) == 0 else age[0]
+                        criterias['height'] = None if len(height) == 0 else height[0]
+                        criterias['education'] = None if len(education) == 0 else education[0]
+                        criterias['nationality'] = None if len(nationality) == 0 else nationality[0]
+                        criterias['marriage'] = None if len(marriage) == 0 else marriage[0]
+                        criterias['location'] = None if len(location) == 0 else location[0]
+                    # print("[Debug] 择偶标准: {}".format(criterias))
+
+                    # 获取用户的详细信息
+                    user_results = html.find("ul", class_ = "member_info_list fn-clear").find_all('em')
+                    pattern = r"<.*?>(.*?)<.*?>"
+                    details = {}
+                    for (index, item) in enumerate(user_results):
+                        info = re.findall(pattern, str(item)).pop()
+                        details[names[index]] = info
+                    # print("[Debug] 用户详细个人信息: {}".format(details))
+                    return details
+                except AttributeError:
+                    print("[Error] 被屏蔽了")
+                    slider_cracker = SliderCracker(url)
+                    slider_cracker.crack()     
+                    task = asyncio.create_task(self.__deep_search(id))
+                    return await task
+        except ChunkedEncodingError as error:
+            print("[Error] {}".format(error))
+            task = asyncio.create_task(self.__deep_search(id))
+            return await task
+        except requests.exceptions.SSLError as ssl_error:
+            print("[Error] {}".format(ssl_error))
+            task = asyncio.create_task(self.__deep_search(id))
+            return await task
+        except Exception as err:
+            print("[Error] {}".format(err))
+            task = asyncio.create_task(self.__deep_search(id))
+            return await task
+
+    async def req(self, page: int, payload):
+        data = await super(AsyncJiaYuanSpider, self).req(payload)
+        if data == None:
+            return None 
+        else:
+            data = data[11:]
             data = data[:-13]
             try:
                 data = json.loads(data)
+                return data 
             except JSONDecodeError:
-                print('[Error] JsonDecodeError in page {}'.format(page))
-                data = []
-            return data
-        else:
-            print('失败获取数据')
-            sys.exit(-1)
+                print('[Error] json decode error in page {}'.format(page))
+                # print("[Debug] {}".format(data))
+                return None
     
-    def Extarct(self, data):
+    # 提取用户信息并从个人主页中拿到更加详细的个人信息
+    async def extarct(self, data):
+        if data == None:
+            return None
         extract_data = []
-        keys = ['uid', 'realUid', 'nickname', 'sex', 'marriage', 'height', 'education', 'income', 'work_location', 'image', "randListTag", "randTag", "shortnote"]
+        keys = ['uid', 'nickname', 'sex', 'marriage', 'height', 'education', 'income', 'work_location', 'image', "randListTag", "randTag", "shortnote"]
         user_info = data['userInfo']
         for item in user_info:
             extract_item = {}
             for k, v in item.items():
                 if k == 'uid' and v == 253091710:
-                    return None
+                    # 这是自己的 UID, 直接跳过
+                    break
+                elif k == 'realUid':
+                    # 爬取用户更详细的信息
+                    task = asyncio.create_task(self.__deep_search(v))
+                    details = await task
+                    # 对信息进行合并
+                    extract_item = dict(extract_item, **details)
+                    # print("[Debug] 用户个人信息: {}".format(extract_item))
                 elif k in keys:
                     filter_value = re.compile(r'<[^>]+>', re.S)
                     filter_value = filter_value.sub(' ', str(v))
                     extract_item[k] = filter_value
             extract_data.append(extract_item)
         return extract_data
+    
+    # 模拟登陆并获取对应的 cookie 以拿到更详细的信息
+    async def login(self, username, password):
+        try:
+            # 首先访问登录页，拿到所有有关登陆的信息
+            response = self.session.get('http://login.jiayuan.com', headers = self.headers)
+            if response.status_code == 200:
+                html = BeautifulSoup(response.text, 'html.parser')
+                # 获取所有 input 信息
+                payload = {}
+                for item in html.find_all('input'):
+                    if item.get('name') != None:
+                        payload[item.get('name')] = item.get('value')
+                # 构造登录需要的 payload
+                payload['name'] = username
+                payload['password'] = password
+                # print("[Debug] payload: {}".format(payload))
+                try:
+                    # 向登录 URL 发送请求
+                    response = self.session.post(self.login_url, data = payload, headers = self.headers)
+                    if response.status_code == 200:
+                        print('[Debug] {}'.format(response.text))
+                        if response.text.count(u'jump'):
+                            print('[Debug] Success to login')
+                        else:
+                            print('[Debug] Fail to login')
+                            sys.exit(-1)
+                    else:
+                        print("[Error] Fail to login, status code is {}".format(response.status_code))
+                        self.login()
+                except Exception as error:
+                    print("[Error] Fali to login, error is {}".format(error))
+                    # self.login()
+                    sys.exit(-1)
+            else:
+                print("[Error] Fail to visit login page, status code is {}".format(response.status_code))
+        except Exception as error:
+            print("[Error] Fail to visit login page, error is {}".format(error))
+            sys.exit(-1)
 
     
-    async def StoreCsv(self, filename, data):
-        with open(filename, 'a+', encoding='utf-8') as f:
-            csv_writer = csv.writer(f)
-            for item in data:
-                info = [str(v) for v in item.values()]
-                self.mutex.acquire()
-                csv_writer.writerow(info)
-                self.mutex.release()
 
-    async def Run(self, page: int):
-        req_task = asyncio.create_task(self.Req(page))
+    async def run(self, page: int, payload: dict):
+        print("[Debug] Spider is running in page {}".format(page))
+        req_task = asyncio.create_task(self.req(page, payload))
         data = await req_task
-        if len(data) == 0:
-            return 
-        else:
-            flush_data = self.Extarct(data)
-            # print(flush_data)
-            write_task = asyncio.create_task(self.StoreCsv("data.csv", flush_data))
-            await write_task
-
-async def main():
-    url = 'https://search.jiayuan.com/v2/search_v2.php'
-    cookie_txt = open('cookie.txt', mode='r')
-    cookie = cookie_txt.read()
-    cookie_txt.close()
-    mutex = Lock()
-    # title = ['用户 id', '真实的用户 id', '昵称', '性别', '婚姻状况', '身高', '受教育程度', '收入', '工作地点', '图片', "随机返回的标签列表", "随机返回的标签", "简介"]
-    # with open("data.csv", 'a+', encoding='utf-8') as f:
-    #     csv_writer = csv.writer(f)
-    #     csv_writer.writerow(title)
-    for page in range(1, 500):
-        spider = AsyncSpider(url, cookie, mutex)
-        task = asyncio.create_task(spider.Run(page))
-        await task
-
-if __name__ == '__main__':
-    asyncio.run(main())
-
-
-
+        extarct_task = asyncio.create_task(self.extarct(data))
+        flush_data = await extarct_task
+        persist_task = asyncio.create_task(self.persist(flush_data))
+        await persist_task
