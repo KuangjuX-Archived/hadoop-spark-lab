@@ -1,5 +1,5 @@
-import numpy as np
-import math
+
+
 
 def ease_out_quad(x):
     return 1 - (1 - x) * (1 - x)
@@ -25,13 +25,13 @@ def ease_out_bounce(x):
         x -= 2.625 / d1 
         return n1 * x * x + 0.984375
 
-def get_tracks(distance, seconds, ease_func):
-    tracks = [0]
-    offsets = [0]
-    for t in np.arange(0.0, seconds, 0.1):
-        offset = round(ease_func(t/seconds) * distance)
-        tracks.append(offset - offsets[-1])
-        offsets.append(offset)
-    return offsets, tracks
+# def get_tracks(distance, seconds, ease_func):
+#     tracks = [0]
+#     offsets = [0]
+#     for t in np.arange(0.0, seconds, 0.1):
+#         offset = round(ease_func(t/seconds) * distance)
+#         tracks.append(offset - offsets[-1])
+#         offsets.append(offset)
+#     return offsets, tracks
 
 
