@@ -36,7 +36,8 @@ jobs:
           git config --local user.name ${{ secrets.USERNAME }}
           sudo cp -p ./chrome/chromedriver /usr/bin/
           chmod -R 777 /usr/bin/chromedriver
-          python ./spider/main.py 1 200 ./spider/data/世纪佳缘-男.csv
+          cd ./spider
+          python ./main.py 1 200 ./data/世纪佳缘-男.csv
           git add .
           git commit -m "update by github action"
           git push
