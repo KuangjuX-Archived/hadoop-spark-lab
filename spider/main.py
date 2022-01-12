@@ -72,7 +72,7 @@ async def async_jiayuan_main():
     spider = AsyncJiaYuanSpider(url, cookies, filename, write_lock)
     for page in range(int(start_page), int(end_page)):
         payload = [
-            ('sex', 'f'),
+            ('sex', 'm'),
             ('key', ''), 
             ('stc', '23:1'),
             ('sn', 'default'),
