@@ -135,8 +135,8 @@ class AsyncJiaYuanSpider(AsyncSpider):
                     criterias['criterias_eduction'] = education
                     criterias['criterias_marriage'] = marriage
                     criterias['criterias_location'] = location
-                    print("[Debug] URL: {}".format(url))
-                    print("[Debug] 择偶标准: {}".format(criterias))
+                    # print("[Debug] URL: {}".format(url))
+                    # print("[Debug] 择偶标准: {}".format(criterias))
                     # print("[Debug] 年龄: {}".format(age))
                     # print("[Debug] 身高: {}".format(height))
                     # print("[Debug] 民族: {}".format(nationality))
@@ -263,5 +263,5 @@ class AsyncJiaYuanSpider(AsyncSpider):
         data = await req_task
         extarct_task = asyncio.create_task(self.extarct(data))
         flush_data = await extarct_task
-        # persist_task = asyncio.create_task(self.persist(flush_data))
-        # await persist_task
+        persist_task = asyncio.create_task(self.persist(flush_data))
+        await persist_task
