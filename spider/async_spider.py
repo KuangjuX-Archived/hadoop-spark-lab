@@ -108,30 +108,42 @@ class AsyncJiaYuanSpider(AsyncSpider):
                 html = BeautifulSoup(response.text, 'html.parser')
                 try:
                     # 获取择偶标准
-                    criteria_results = html.find("ul", class_ = "js_list fn-clear").find_all('li')
+                    criteria_results = html.find("ul", class_ = "js_list fn-clear").find_all('li', class_ = "fn-clear")
                     criterias = {}
                     # print(criteria_results)
-                    age_pattern = '.*?龄：</span><div class="ifno_r_con">(.*?)<font.*?>'
-                    height_pattern = '.*?高：</span><div class="ifno_r_con">(.*?)<font.*?>'
-                    education_pattern = '.*?历：</span><div class="ifno_r_con">(.*?)<font.*?>'
-                    nationality_pattern = '.*?族：</span><div class="ifno_r_con">(.*?)</div></li>'
-                    marriage_pattern = '婚姻状况：</span><div class="ifno_r_con">(.*?)<font.*?>'
-                    location_pattern = '.*?地：</span> \
-<div class="ifno_r_con_1">(.*?)<font.*?>'
-                    for(index, item) in enumerate(criteria_results):
-                        age = re.findall(age_pattern, str(item))
-                        height = re.findall(height_pattern, str(item))
-                        education = re.findall(education_pattern, str(item))
-                        nationality = re.findall(nationality_pattern, str(item))
-                        marriage = re.findall(marriage_pattern, str(item))
-                        location = re.findall(location_pattern, str(item))
-                        criterias['criterias_age'] = None if len(age) == 0 else age[0]
-                        criterias['criterias_height'] = None if len(height) == 0 else height[0]
-                        criterias['criterias_education'] = None if len(education) == 0 else education[0]
-                        criterias['criterias_nationality'] = None if len(nationality) == 0 else nationality[0]
-                        criterias['criterias_marriage'] = None if len(marriage) == 0 else marriage[0]
-                        criterias['criterias_location'] = None if len(location) == 0 else location[0]
-                    # print("[Debug] 择偶标准: {}".format(criterias))
+                    age_pattern = '龄：</span><div class="ifno_r_con">(.*?)</div>'
+                    height_pattern = '高：</span><div class="ifno_r_con">(.*?)</div>'
+                    education_pattern = '历：</span><div class="ifno_r_con">(.*?)</div>'
+                    nationality_pattern = '族：</span><div class="ifno_r_con">(.*?)</div>'
+                    marriage_pattern = '婚姻状况：</span><div class="ifno_r_con">(.*?)</div>'
+                    location_pattern = '<div class="ifno_r_con_1">(.*?)</div>'
+                    age = re.findall(age_pattern, str(criteria_results[0]))
+                    height = re.findall(height_pattern, str(criteria_results[1]))
+                    nationality = re.findall(nationality_pattern, str(criteria_results[2]))
+                    education = re.findall(education_pattern, str(criteria_results[3]))
+                    marriage = re.findall(marriage_pattern, str(criteria_results[5]))
+                    location = re.findall(location_pattern, str(criteria_results[6]))
+                    age = None if len(age) == 0 else age[0]
+                    height = None if len(height) == 0 else height[0]
+                    nationality = None if len(nationality) == 0 else nationality[0]
+                    education = None if len(education) == 0 else education[0]
+                    marriage = None if len(marriage) == 0 else marriage[0]
+                    location = None if len(location) == 0 else location[0]
+                    criterias['criterias_age'] = age
+                    criterias['criterias_height'] = height
+                    criterias['criterias_nationality'] = nationality
+                    criterias['criterias_eduction'] = education
+                    criterias['criterias_marriage'] = marriage
+                    criterias['criterias_location'] = location
+                    print("[Debug] URL: {}".format(url))
+                    print("[Debug] 择偶标准: {}".format(criterias))
+                    # print("[Debug] 年龄: {}".format(age))
+                    # print("[Debug] 身高: {}".format(height))
+                    # print("[Debug] 民族: {}".format(nationality))
+                    # print("[Debug] 教育: {}".format(education))
+                    # print("[Debug] 婚姻状况: {}".format(marriage))
+                    # print("[Debug] 居住地: {}".format(location))
+
 
                     # 获取用户的详细信息
                     user_results = html.find("ul", class_ = "member_info_list fn-clear").find_all('em')
@@ -251,5 +263,5 @@ class AsyncJiaYuanSpider(AsyncSpider):
         data = await req_task
         extarct_task = asyncio.create_task(self.extarct(data))
         flush_data = await extarct_task
-        persist_task = asyncio.create_task(self.persist(flush_data))
-        await persist_task
+        # persist_task = asyncio.create_task(self.persist(flush_data))
+        # await persist_task
