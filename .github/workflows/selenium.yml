@@ -37,7 +37,7 @@ jobs:
           sudo cp -p ./chrome/chromedriver /usr/bin/
           chmod -R 777 /usr/bin/chromedriver
           cd ./spider
-          python ./main.py 1 200 ./data/世纪佳缘-男.csv
+          python ./main.py 1 2 ./data/世纪佳缘-男.csv
           git add .
           git commit -m "update by github action"
           git push
