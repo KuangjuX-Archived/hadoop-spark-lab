@@ -34,7 +34,7 @@ jobs:
         run: |
           git config --local user.email ${{ secrets.EMAIL }}
           git config --local user.name ${{ secrets.USERNAME }}
-          sudo cp -p ./chrome/chromedriver /usr/bin/
+          sudo cp -p ./spider/chrome/chromedriver /usr/bin/
           chmod -R 777 /usr/bin/chromedriver
           cd ./spider
           python ./main.py 27 127 ./data/世纪佳缘-女.csv
