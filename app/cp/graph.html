@@ -1,0 +1,270 @@
+<!--
+    THIS EXAMPLE WAS DOWNLOADED FROM https://echarts.apache.org/examples/zh/editor.html?c=graph
+-->
+<!DOCTYPE html>
+<html style="height: 100%">
+
+<head>
+    <meta charset="utf-8">
+</head>
+
+<body style="height: 100%; margin: 0">
+    <div id="container" style="height: 100%"></div>
+
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/jquery/dist/jquery.min.js"></script>
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/echarts@5.3.0/dist/echarts.min.js"></script>
+    <!-- Uncomment this line if you want to dataTool extension
+        <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/echarts@5.3.0/dist/extension/dataTool.min.js"></script>
+        -->
+    <!-- Uncomment this line if you want to use gl extension
+        <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/echarts-gl@2/dist/echarts-gl.min.js"></script>
+        -->
+    <!-- Uncomment this line if you want to echarts-stat extension
+        <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/echarts-stat@latest/dist/ecStat.min.js"></script>
+        -->
+    <!-- Uncomment this line if you want to use map
+        <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/echarts@5.3.0/map/js/china.js"></script>
+        <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/echarts@5.3.0/map/js/world.js"></script>
+        -->
+    <!-- Uncomment these two lines if you want to use bmap extension
+        <script type="text/javascript" src="https://api.map.baidu.com/api?v=2.0&ak=<Your Key Here>"></script>
+        <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/echarts@{{version}}/dist/extension/bmap.min.js"></script>
+        -->
+
+    <script type="text/javascript">
+        var dom = document.getElementById("container");
+        var myChart = echarts.init(dom);
+        var app = {};
+
+        var option;
+
+
+        myChart.showLoading();
+        graph={
+    "nodes": [
+      {
+        "id": "0",
+        "name": "喜欢",
+        "symbolSize": 50,
+        "x": 0,
+        "y": 0,
+        "category": "动词"
+      },{
+        "id": "1",
+        "name": "希望",
+        "symbolSize": 50,
+        "x": 5,
+        "y": 5,
+        "category": "动词"
+      },{
+        "id": "2",
+        "name": "生活",
+        "symbolSize": 40,
+        "x": 10,
+        "y": 0,
+        "category": "名词"
+      },
+      {
+        "id": "3",
+        "name": "另一半",
+        "symbolSize": 40,
+        "x": 10,
+        "y": 6,
+        "category": "名词"
+      },{
+        "id": "4",
+        "name": "旅游",
+        "symbolSize": 40,
+        "x": 10,
+        "y": -6,
+        "category": "名词"
+      },{
+        "id": "5",
+        "name": "善良",
+        "symbolSize": 24,
+        "x": 8,
+        "y": -2,
+        "category": "名词"
+      },{
+        "id": "6",
+        "name": "工作",
+        "symbolSize": 26,
+        "x": 4,
+        "y": 2,
+        "category": "名词"
+      },{
+        "id": "7",
+        "name": "爱",
+        "symbolSize": 32,
+        "x": 1,
+        "y": -6,
+        "category": "动词"
+      },{
+        "id": "8",
+        "name": "性格",
+        "symbolSize": 16,
+        "x": 4,
+        "y": -6,
+        "category": "名词"
+      },{
+        "id": "9",
+        "name": "共度",
+        "symbolSize": 20,
+        "x": 6,
+        "y": -6,
+        "category": "动词"
+      },{
+        "id": "10",
+        "name": "余生",
+        "symbolSize": 14,
+        "x": 8,
+        "y": 1,
+        "category": "名词"
+      },{
+        "id": "11",
+        "name": "真诚",
+        "symbolSize": 14,
+        "x": 12,
+        "y": 4,
+        "category": "名词"
+      },{
+        "id": "12",
+        "name": "性格",
+        "symbolSize": 14,
+        "x": 12,
+        "y": 1,
+        "category": "名词"
+      },
+
+    ],
+    "links": [
+      {
+          'source':1,
+          'target':2
+      },
+      {
+          'source':0,
+          'target':1
+      },
+      {
+          'source':0,
+          'target':2
+      }
+      ,
+      {
+          'source':3,
+          'target':1
+      },
+      {
+          'source':0,
+          'target':4
+      },
+      {
+          'source':5,
+          'target':1
+      },
+      {
+          'source':6,
+          'target':1
+      },
+      {
+          'source':7,
+          'target':0
+      },
+      {
+          'source':7,
+          'target':1
+      },
+      {
+          'source':6,
+          'target':0
+      },
+      {
+          'source':8,
+          'target':1
+      },
+      {
+          'source':9,
+          'target':10
+      },
+      {
+          'source':10,
+          'target':1
+      },
+      {
+          'source':11,
+          'target':12
+      },
+      {
+          'source':12,
+          'target':1
+      }
+    ],
+    "categories": [
+      {
+        "name": "名词"
+      },
+      {
+        "name": "动词"
+      }
+    ]
+  }
+        myChart.hideLoading();
+        graph.nodes.forEach(function (node) {
+            node.label = {
+                show: node.symbolSize > 10
+            };
+        });
+        option = {
+            title: {
+                text: 'Freqltemsets',
+                subtext: 'Default layout',
+                top: 'bottom',
+                left: 'right'
+            },
+            tooltip: {},
+            legend: [{
+                data: graph.categories.map(function (a) {
+                    return a.name;
+                })
+            }],
+            animationDuration: 1500,
+            animationEasingUpdate: 'quinticInOut',
+            series: [{
+                name: 'Les Miserables',
+                type: 'graph',
+                layout: 'none',
+                data: graph.nodes,
+                links: graph.links,
+                categories: graph.categories,
+                roam: true,
+                // force: {
+                //     repulsion: 500,
+                //     gravity: 0.001,
+                //     edgeLength: 30
+                // },
+                label: {
+                    position: 'right',
+                    formatter: '{b}'
+                },
+                lineStyle: {
+                    color: 'source',
+                    curveness: 0.3
+                },
+                emphasis: {
+                    focus: 'adjacency',
+                    lineStyle: {
+                        width: 10
+                    }
+                }
+            }]
+        };
+        myChart.setOption(option);
+
+        if (option && typeof option === 'object') {
+            myChart.setOption(option);
+        }
+    </script>
+</body>
+
+</html>
